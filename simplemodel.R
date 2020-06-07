@@ -1,6 +1,6 @@
 # Vaccine Strategy Simple Model
 
-setwd("~/Vaccine Strategy")
+setwd("~/Vaccine Strategy/Vaccine_Allocation_Project")
 
 # _____________________________________________________________________
 # IMPORT ----
@@ -56,7 +56,7 @@ plot_all_ages_overtime=function(df, compartment){
   
   # make new df for plotting
   col_to_gather <- vector(mode="character", length=nage)
-  for (i in 1:8) {col_to_gather[i] <- paste0(compartment,i)}
+  for (i in 1:9) {col_to_gather[i] <- paste0(compartment,i)}
   
   new_df <- df %>%
     select(time, col_to_gather) %>%
@@ -73,6 +73,7 @@ plot_all_ages_overtime=function(df, compartment){
     else if (new_df$age_group[i] == col_to_gather[6]) {new_df$percent[i] <- new_df$percent[i]/N[6]}
     else if (new_df$age_group[i] == col_to_gather[7]) {new_df$percent[i] <- new_df$percent[i]/N[7]}
     else if (new_df$age_group[i] == col_to_gather[8]) {new_df$percent[i] <- new_df$percent[i]/N[8]}
+    else if (new_df$age_group[i] == col_to_gather[9]) {new_df$percent[i] <- new_df$percent[i]/N[9]}
   }
   
   # Plot
@@ -82,7 +83,7 @@ plot_all_ages_overtime=function(df, compartment){
     geom_line(aes(color = age_group), size = 2) +
     xlab("Time") +
     scale_color_brewer(palette = "Spectral", name = "Age Group", 
-                       labels =  c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70+"))
+                       labels =  c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+"))
   
   if (compartment == "I") {
     p <- p + ylab("Percent Infected") + ylim(0,0.4)
@@ -93,15 +94,17 @@ plot_all_ages_overtime=function(df, compartment){
 
 plot_one_age_overtime = function(col_name, age_group_num) {
   # INPUTS:
-  # group: charcater of col of interest from df. Specifies age group and compartment of interest
+  # col_name: "I2" == infected, age group 2
+  # age_group_num: age group of interest, 1 = 0-9, 2 = 10-18, ...
   #
   # OUTPUT:
   # p: ggplot object plotting all strats for one age group & one compartment
-  group <- 18
+  
   nstrat <- 3
   new_df <- data.frame(matrix(ncol = nstrat+1, nrow = dim(df_novax)[1]))
   colnames(new_df) <- c("time", "no_vax", "everyone", "kids")
   new_df$time <- df_novax$time
+  
   # Make sure col of interest are stored as vectors
   new_df$no_vax <- unlist(as.data.frame(df_novax)[col_name]/N[age_group_num])
   new_df$everyone <- unlist(as.data.frame(df_prop)[col_name]/N[age_group_num])
@@ -134,23 +137,17 @@ get_legend<-function(myggplot){
 # SETUP ----
 # _____________________________________________________________________
 # Demographics
-C <- readRDS("C_USA_bytens.RData")
+C <- readRDS("C_USA_bytens_all.RData")
 
-frac_age <- read.xlsx("USA_demographics.xlsx", "data_bytens", header = FALSE)
-colnames(frac_age) <- c("age_bins", "percent")
+frac_age <- read.xlsx("USA_demographics.xlsx", "data_bytens", header = FALSE, row.names = TRUE)
+frac_age <- as.vector(frac_age[[1]])
 
-barplot(frac_age$percent, xlab = ("Age Groups"), ylab = "Percent", 
-        names.arg = c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+"))
-
-frac_age$percent[8] <- frac_age$percent[8] + frac_age$percent[9]
-frac_age <- frac_age[-c(9), ]
-
-barplot(frac_age$percent, xlab = ("Age Groups"), ylab = "Percent", 
-        names.arg = c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70+"))
+#barplot(frac_age, xlab = ("Age Groups"), ylab = "Percent", 
+#        names.arg = c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+"))
 
 npop <- 1000000
-N <-  npop*frac_age$percent/100      
-nage <- length(frac_age$percent)
+N <-  npop*frac_age/100      
+nage <- length(frac_age)
 
 # Initialize simulation with 1 infected in each age group 
 I_0    <- rep(1,nage)
@@ -174,7 +171,7 @@ beta  <- 0.05 # TODO: double check how Towers calculates beta using R0
 nvax <- 0.10*npop 
 
 # prop strategy
-vax_prop <- nvax*frac_age$percent/100
+vax_prop <- nvax*frac_age/100
 
 I_0    <- rep(1,nage)
 S_0    <- N-I_0-vax_prop
@@ -251,8 +248,7 @@ grid.arrange(p_novaxI, p_propI, p_propkidsI, legend, p_novaxR, p_propR, p_propki
 
 
 # * Plot for one age group, different strats ----
-# pass in column number of age group/compartment of interest
-# i.e. infected agents age group 0-9 is column 18
+
 p_kids_I <- plot_one_age_overtime(col_name = "I2", age_group_num = 2) +
   theme(legend.position = "none") +
   ggtitle("Ages 10-19")
