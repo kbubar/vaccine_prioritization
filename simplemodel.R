@@ -167,6 +167,7 @@ beta  <- 0.05 # TODO: double check how Towers calculates beta using R0
 # VACCINE STRATEGIES ----
 #     prop: distribute proportionally to each age group
 #     propkids: distribute proportionally to age groups < 20
+#     propadults: distribute proportionally to age groups 20-49
 # _____________________________________________________________________
 nvax <- 0.10*npop 
 
@@ -176,7 +177,7 @@ vax_prop <- nvax*frac_age/100
 I_0    <- rep(1,nage)
 S_0    <- N-I_0-vax_prop
 E_0    <- rep(0,nage)
-R_0    <- rep(0,nage) # vax_prop
+R_0    <- rep(0,nage)
 
 inits_prop <- c(S=S_0,E=E_0,I=I_0,R=R_0)
 
@@ -191,9 +192,25 @@ vax_propkids <- nvax*vax_dist_propkids
 I_0    <- rep(1,nage)
 S_0    <- N-I_0-vax_propkids
 E_0    <- rep(0,nage)
-R_0    <- rep(0,nage) # vax_propkids
+R_0    <- rep(0,nage)
 
 inits_propkids <- c(S=S_0,E=E_0,I=I_0,R=R_0)
+
+# propadults strategy
+nadults <- N[3] + N[4] + N[5]
+vax_dist_propadults <- rep(0, nage)
+vax_dist_propadults[3] <- N[3]/nadults
+vax_dist_propadults[4] <- N[4]/nadults
+vax_dist_propadults[5] <- N[5]/nadults
+
+vax_propadults <- nvax*vax_dist_propadults
+
+I_0    <- rep(1,nage)
+S_0    <- N-I_0-vax_propadults
+E_0    <- rep(0,nage)
+R_0    <- rep(0,nage) 
+
+inits_propadults <- c(S=S_0,E=E_0,I=I_0,R=R_0)
 # _____________________________________________________________________
 # NUMERICALLY SOLVE ----
 # _____________________________________________________________________
@@ -204,6 +221,7 @@ t <- seq(0,80,1)
 df_novax <- as.data.frame(lsoda(inits_novax, t, calculate_derivatives, parameters)) %>% as_tibble()
 df_prop <- as.data.frame(lsoda(inits_prop, t, calculate_derivatives, parameters)) %>% as_tibble()
 df_propkids <- as.data.frame(lsoda(inits_propkids, t, calculate_derivatives, parameters)) %>% as_tibble()
+df_propadults <- as.data.frame(lsoda(inits_propadults, t, calculate_derivatives, parameters)) %>% as_tibble()
 
 # _____________________________________________________________________
 # RESULTS ----
@@ -230,6 +248,11 @@ p_propkidsI <- plot_all_ages_overtime(df_propkids, compartment) +
 legend <- get_legend(p_propkidsI)
 p_propkidsI <- p_propkidsI + theme(legend.position = "none")
 
+p_propadultsI <- plot_all_ages_overtime(df_propadults, compartment) +
+  theme(legend.position = "none") +
+  ggtitle("Proportional to adults (20-49)")
+
+# _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 compartment <- "R"
 p_novaxR <- plot_all_ages_overtime(df_novax, compartment) +
   theme(legend.position = "none") +
@@ -244,7 +267,7 @@ p_propkidsR <- plot_all_ages_overtime(df_propkids, compartment) +
   ggtitle("Proportional to just kids (<20)")
 
 grid.arrange(p_novaxI, p_propI, p_propkidsI, legend, p_novaxR, p_propR, p_propkidsR, ncol=4, widths=c(2.3, 2.3, 2.3, 0.8))
-
+grid.arrange(p_novaxI, p_propI, legend, p_propkidsI,  p_propadultsI, ncol=3, widths=c(2.3, 2.3, 0.8))
 
 
 # * Plot for one age group, different strats ----
