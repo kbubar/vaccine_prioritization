@@ -1,7 +1,7 @@
 # Combine 5 year age-group contact matrix from Prem for 10 years age-groups 
 
 # setwd to file with Prem contact matrices
-setwd("~/Vaccine Strategy/Vaccine_Allocation_Project/Prem_contact_matrices_152_countries")
+setwd("~/Vaccine Strategy/Vaccine_Allocation_Project/Prem_contact_matrices")
 
 # IMPORT ----
 library("xlsx")
@@ -91,14 +91,18 @@ C_bytens_all <- convert_bins_5to10(C_byfives_all)
 heatmap(C_bytens_all, NA, NA, scale = "none", xlab = "Age of Individual", ylab = "Age of Contact")
 
 C_bytens_all <- add_80bin(C_bytens_all)
-heatmap(C_bytens_all, NA, NA, scale = "none", xlab = "Age of Individual", ylab = "Age of Contact")
+heatmap(C_bytens_all, NA, NA, scale = "column", xlab = "Age of Individual", ylab = "Age of Contact")
 
 
 #* C without school (home, work & other) ----
+school <- read.xlsx("MUestimates_school_2.xlsx", country, header = FALSE)
+C_byfives_noschool <- C_byfives_all - school
+C_bytens_noschool <- convert_bins_5to10(C_byfives_noschool)
+heatmap(C_bytens_noschool, NA, NA, scale = "none", xlab = "Age of Individual", ylab = "Age of Contact")
 
-#TODO 
-
+C_bytens_noschool <- add_80bin(C_bytens_noschool)
+heatmap(C_bytens_noschool, NA, NA, scale = "column", xlab = "Age of Individual", ylab = "Age of Contact")
 
 # SAVE FILE as .RData  ----
 saveRDS(C_bytens_all, "C_USA_bytens_all.RData")
-
+saveRDS(C_bytens_noschool, "C_USA_bytens_noschool.RData")
