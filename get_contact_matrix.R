@@ -7,6 +7,7 @@ setwd("~/Vaccine Strategy/Vaccine_Allocation_Project/Prem_contact_matrices")
 library("xlsx")
 library("tidyverse")
 library("RColorBrewer")
+library(gplots)
 
 # FUNCTION ---- 
 # convert C to 10 year age-groups
@@ -83,15 +84,20 @@ add_80bin <- function(C_bytens){
 # Convert 5 years age bins to 10 year age bins
 # Add 80+ age bin
 
-country <- "United States of America"
-
+#country <- "United States of America"
+country <- "Belgium"
 #* C for all locations (home, work, school & other) ----
 C_byfives_all <- read.xlsx("MUestimates_all_locations_2.xlsx", country, header = FALSE)
 C_bytens_all <- convert_bins_5to10(C_byfives_all)
-heatmap(C_bytens_all, NA, NA, scale = "none", xlab = "Age of Individual", ylab = "Age of Contact")
+heatmap(C_bytens_all, NA, NA, scale = "column", xlab = "Age of Individual", ylab = "Age of Contact")
 
 C_bytens_all <- add_80bin(C_bytens_all)
-heatmap(C_bytens_all, NA, NA, scale = "column", xlab = "Age of Individual", ylab = "Age of Contact")
+heatmap(C_bytens_all-belgium, NA, NA, scale = "none", 
+        #xlab = "Age of Individual", 
+        #ylab = "Age of Contact", 
+        cexRow = 1.5, 
+        cexCol = 1.5)
+
 
 
 #* C without school (home, work & other) ----
@@ -104,5 +110,14 @@ C_bytens_noschool <- add_80bin(C_bytens_noschool)
 heatmap(C_bytens_noschool, NA, NA, scale = "column", xlab = "Age of Individual", ylab = "Age of Contact")
 
 # SAVE FILE as .RData  ----
-saveRDS(C_bytens_all, "C_USA_bytens_all.RData")
-saveRDS(C_bytens_noschool, "C_USA_bytens_noschool.RData")
+ saveRDS(C_bytens_all, "C_Belgium_bytens_all.RData")
+# saveRDS(C_bytens_noschool, "C_USA_bytens_noschool.RData")
+
+dif <- matrix(nrow = 9, ncol = 9)
+# check symmetry with age demographics
+for (i in 1:9){
+  for (j in 1:9){
+    dif[i, j] <- C_bytens_all[j,i]*age_demo[j] - C_bytens_all[i,j]*age_demo[i]
+  }
+}
+max(abs(dif))

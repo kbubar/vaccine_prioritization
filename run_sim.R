@@ -1,89 +1,274 @@
-run_sim = function(C, percent_vax, strategy, u = u_constant, v_e = v_e_constant, frac_age = age_demo, npop = pop_total, N = N_i, nage = num_groups){
+run_sim = function(C, percent_vax, strategy, u = u_constant, v_e = v_e_constant, frac_age = age_demo, npop = pop_total, N = N_i, nage = num_groups, sero = sero_none, sero_testing = FALSE){
 
   # Disease Tranmission
   nu    <- 1/3 # incubation period (E -> I), ref: Davies
   gamma <- 1/5 # recovery period (I -> R), ref: Davies
 
   # _____________________________________________________________________
-  # VACCINE STRATEGIES ----
-  #     propall: distribute proportionally to each age group
-  #     propkids: distribute proportionally to age groups < 20
-  #     propadults: distribute proportionally to age groups 20-49
-  #     propelderly: distribute proportionally to age groups 60+
+  # INITIAL CONDITIONS ----
+  # Vaccine strategies distribute proportionally to 
+  #     all: all age groups
+  #     kids: age groups < 20
+  #     adults: age groups 20-49
+  #     elderly: age groups 60+
+  #     20+: age groups 20+
   # _____________________________________________________________________
-  nvax <- percent_vax*npop 
-  
-  # Initialize simulation with 1 infected in each age group 
-  I_0    <- rep(1,nage)
   E_0    <- rep(0,nage)
-  R_0    <- rep(0,nage)
+  R_0    <- N * sero
   
+  # specify group to vaccinate according to allocation strategy
   if (strategy == "no vax"){
-    S_0    <- N-I_0
-    V_0    <- rep(0,nage)
+    V_0 <- rep(0, nage)
+  } else {
+      if (strategy == "all"){ 
+      groups <- 1:9
+    } else if (strategy == "kids"){ 
+      groups <- 1:2
+    } else if (strategy == "adults") { 
+      groups <- 3:5
+    } else if (strategy == "elderly") {
+      groups <- 7:9
+    } else if (strategy == "20+") {
+      groups <- 3:9
+    }
+    people_to_vax <- sum(N[groups])
     
-    inits <- c(S=S_0,E=E_0,I=I_0,R=R_0, V=V_0)
-  } else if (strategy == "all"){
-    # prop strategy
-    vax_propall <- nvax*frac_age
-    vax_propall[vax_propall > N] <- N[vax_propall > N] # don't exceed num people in pop
+    vax_proportion <- rep(0, nage)
+    vax_proportion[groups] <- N[groups]/people_to_vax
     
-    S_0    <- N-I_0-vax_propall
-    V_0    <- vax_propall
+    nvax <- percent_vax*npop 
+    vax_distribution <- nvax*vax_proportion
+    vax_distribution[vax_distribution > N] <- N[vax_distribution > N]
     
-    inits <- c(S=S_0, E=E_0, I=I_0, R=R_0, V=V_0)
-  } else if (strategy == "kids"){
-    # propkids strategy
-    nkids <- N[1] + N[2]
-    vax_dist_propkids <- rep(0, nage)
-    vax_dist_propkids[1] <- N[1]/nkids
-    vax_dist_propkids[2] <- N[2]/nkids
+    prob_vaccinated <- vax_distribution/N
     
-    vax_propkids <- nvax*vax_dist_propkids
-    vax_propkids[vax_propkids > N] <- N[vax_propkids > N]
-    
-    S_0    <- N-I_0-vax_propkids
-    V_0    <- vax_propkids
-    
-    inits <- c(S=S_0,E=E_0,I=I_0,R=R_0, V=V_0)
-  } else if (strategy == "adults") {
-    # propadults strategy
-    nadults <- N[3] + N[4] + N[5]
-    vax_dist_propadults <- rep(0, nage)
-    vax_dist_propadults[3] <- N[3]/nadults
-    vax_dist_propadults[4] <- N[4]/nadults
-    vax_dist_propadults[5] <- N[5]/nadults
-    
-    vax_propadults <- nvax*vax_dist_propadults
-    vax_propadults[vax_propadults > N] <- N[vax_propadults > N]
-    
-    S_0    <- N-I_0-vax_propadults
-    V_0    <- vax_propadults
-    
-    inits <- c(S=S_0,E=E_0,I=I_0,R=R_0, V=V_0)
-  } else if (strategy == "elderly") {
-    # propelderly strategy
-    nelderly <- N[7] + N[8] + N[9]
-    vax_dist_propelderly <- rep(0, nage)
-    vax_dist_propelderly[7] <- N[7]/nelderly
-    vax_dist_propelderly[8] <- N[8]/nelderly
-    vax_dist_propelderly[9] <- N[9]/nelderly
-    
-    vax_propelderly <- nvax*vax_dist_propelderly
-    vax_propelderly[vax_propelderly > N] <- N[vax_propelderly > N]
-    
-    S_0    <- N-I_0-vax_propelderly
-    V_0    <- vax_propelderly
-    
-    inits <- c(S=S_0,E=E_0,I=I_0,R=R_0, V=V_0)
+    if (sero_testing == FALSE){
+      # account for people who were vaccinated and seropositive
+      V_0    <- vax_distribution - N*prob_vaccinated*sero
+      #V_0 <- vax_distribution*v_e # all or nothing vaccine
+    } else if (sero_testing == TRUE){
+      # assumes everyone vaccinated was seronegative
+      V_0    <- vax_distribution
+      temp <- N - R_0
+      V_0[V_0 > temp] <- temp[V_0 > temp]
+    }
   }
+  # initial I: 1 in each age group unless everyone is vaccinated and/or sero positive
+  I_0 <- rep(0, nage)
+  I_0[(N - R_0 - V_0) > 1] <- 1
+  
+  S_0 <- N - I_0 - V_0 - R_0
+  
+  inits <- c(S=S_0,E=E_0,I=I_0,R=R_0, V=V_0)
+  
   # _____________________________________________________________________
   # NUMERICALLY SOLVE ----
   # _____________________________________________________________________
   parameters = list(beta=u, nu=nu, gamma=gamma, C=C, v_e=v_e)
   
-  t <- seq(0,150,1) 
+  # if (strategy == "no vax" | strategy == "kids" | strategy == "elderly"){
+  #   t <- seq(0,200,1)
+  #   tfinal <- 200
+  # }
+  # else if (strategy == "all"){
+  #   t <- seq(0,500,1)
+  #   tfinal <- 500
+  # }
+  # else if (strategy == "20+"){
+  #   t <- seq(0,600,1)
+  #   tfinal <- 600
+  # }
+  # else if (strategy == "adults"){
+  #   t <- seq(0,800,1)
+  #   tfinal <- 800
+  # }
+
+  t <- seq(0,800,1)
+  tfinal <- 800
   
+  df <- as.data.frame(lsoda(inits, t, calculate_derivatives, parameters))
+  
+  I_tfinal <- sum(df[(tfinal+1),20:28])
+  
+  if (I_tfinal > 1){
+    print("Warning: simulation may not have run long enough")
+  }
+  
+  df
+}
+
+run_sim_nontransmissionblocking = function(C, percent_vax, strategy, u = u_constant, v_e = v_e_constant, frac_age = age_demo, npop = pop_total, N = N_i, nage = num_groups, sero = sero_none, sero_testing = FALSE){
+  
+  # Disease Tranmission
+  nu    <- 1/3 # incubation period (E -> I), ref: Davies
+  gamma <- 1/5 # recovery period (I -> R), ref: Davies
+  
+  # _____________________________________________________________________
+  # INITIAL CONDITIONS ----
+  # Vaccine strategies distribute proportionally to 
+  #     all: all age groups
+  #     kids: age groups < 20
+  #     adults: age groups 20-49
+  #     elderly: age groups 60+
+  #     20+: age groups 20+
+  # _____________________________________________________________________
+  E_0    <- rep(0,nage)
+  R_0    <- N * sero
+  
+  # specify group to vaccinate according to allocation strategy
+  if (strategy == "no vax"){
+    V_0 <- rep(0, nage)
+  } else {
+    if (strategy == "all"){ 
+      groups <- 1:9
+    } else if (strategy == "kids"){ 
+      groups <- 1:2
+    } else if (strategy == "adults") { 
+      groups <- 3:5
+    } else if (strategy == "elderly") {
+      groups <- 7:9
+    } else if (strategy == "20+") {
+      groups <- 3:9
+    }
+    people_to_vax <- sum(N[groups])
+    
+    vax_proportion <- rep(0, nage)
+    vax_proportion[groups] <- N[groups]/people_to_vax
+    
+    nvax <- percent_vax*npop 
+    vax_distribution <- nvax*vax_proportion
+    vax_distribution[vax_distribution > N] <- N[vax_distribution > N]
+    
+    prob_vaccinated <- vax_distribution/N
+    
+    if (sero_testing == FALSE){
+      # account for people who were vaccinated and seropositive
+      V_0    <- vax_distribution - N*prob_vaccinated*sero
+      #V_0 <- vax_distribution*v_e # all or nothing vaccine
+    } else if (sero_testing == TRUE){
+      # assumes everyone vaccinated was seronegative
+      V_0    <- vax_distribution
+      temp <- N - R_0
+      V_0[V_0 > temp] <- temp[V_0 > temp]
+    }
+  }
+  # initial I: 1 in each age group unless everyone is vaccinated and/or sero positive
+  I_0 <- rep(0, nage)
+  I_0[(N - R_0 - V_0) > 1] <- 1
+  
+  S_0 <- N - I_0 - V_0 - R_0
+  
+  inits <- c(S=S_0,E=E_0,I=I_0,R=R_0, VS=V_0, VE = rep(0,nage), VI = rep(0,nage), VR = rep(0,nage))
+  
+  # _____________________________________________________________________
+  # NUMERICALLY SOLVE ----
+  # _____________________________________________________________________
+  parameters = list(beta=u, nu=nu, gamma=gamma, C=C, v_e=v_e)
+  
+  # if (strategy == "no vax" | strategy == "kids" | strategy == "elderly"){
+  #   t <- seq(0,200,1)
+  #   tfinal <- 200
+  # }
+  # else if (strategy == "all"){
+  #   t <- seq(0,500,1)
+  #   tfinal <- 500
+  # }
+  # else if (strategy == "20+"){
+  #   t <- seq(0,600,1)
+  #   tfinal <- 600
+  # }
+  # else if (strategy == "adults"){
+  #   t <- seq(0,800,1)
+  #   tfinal <- 800
+  # }
+  
+  t <- seq(0,1000,1)
+  tfinal <- 1000
+  
+  df <- as.data.frame(lsoda(inits, t, calculate_derivatives_nontransmissionblocking, parameters))
+  
+  I_tfinal <- sum(df[(tfinal+1),20:28])
+  
+  if (I_tfinal > 1){
+    print("Warning: simulation may not have run long enough")
+  }
+  
+  df
+}
+
+run_sim_later_vax <- function(t_infected, strategy, percent_vax, sero_testing = FALSE, 
+                              npop = pop_total, N = N_i, nage = num_groups) {
+  # t_infected = time to distribute vaccine wrt % of infections that have occured
+  
+  df_baseline <- list_all[[1]]
+  R_time <- apply(df_baseline[29:37], 1, sum)
+  R_time <- (R_time/pop_total)*100
+  tot_infected <- compute_total_cases(list_all[[1]])
+  t_init <- length(R_time[R_time <= tot_infected*t_infected])
+  
+  inits <- as.numeric(df_baseline[t_init, -(1)])
+  S_0 <- inits[1:9]
+  E_0 <- inits[10:18]
+  I_0 <- inits[19:27]
+  R_0 <- inits[28:36]
+  
+  sero <- R_0/N_i
+  # age_groups <- c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")
+  # df <- data.frame(age_groups, sero)
+  # 
+  # theme_set(theme_minimal(base_size = 15))
+  # 
+  #  ggplot(df, aes(y=sero*100, x=age_groups)) +
+  #    geom_bar(position="stack", stat="identity") +
+  #    xlab("Age group") +
+  #    ylab("Percent Seropositive") +
+  #    scale_x_discrete(breaks=c("0-9","20-29", "40-49", "60-69", "80+")) +
+  #    theme(plot.subtitle = element_text(size = 9, face = "italic", hjust = 1),
+  #          plot.title = element_text(hjust = 0.5)) +
+  #    ylim(0, 65)
+  
+          
+  if (strategy == "all"){ 
+    groups <- 1:9
+  } else if (strategy == "kids"){ 
+    groups <- 1:2
+  } else if (strategy == "adults") { 
+    groups <- 3:5
+  } else if (strategy == "elderly") {
+    groups <- 7:9
+  } else if (strategy == "20+") {
+    groups <- 3:9
+  }
+  people_to_vax <- sum(N[groups])
+  
+  vax_proportion <- rep(0, nage)
+  vax_proportion[groups] <- N[groups]/people_to_vax
+  
+  nvax <- percent_vax*npop 
+  vax_distribution <- nvax*vax_proportion
+  vax_distribution[vax_distribution > N] <- N[vax_distribution > N]
+  
+  prob_vaccinated <- vax_distribution/N
+  
+  if (sero_testing == FALSE){
+    # account for people who were vaccinated and seropositive
+    V_0    <- vax_distribution - N*prob_vaccinated*sero
+    V_0[V_0 > S_0] <- S_0[V_0 > S_0]
+  } else if (sero_testing == TRUE){
+    # assumes everyone vaccinated was seronegative
+    V_0    <- vax_distribution
+    V_0[V_0 > S_0] <- S_0[V_0 > S_0]
+  }
+  S_0 <- S_0 - V_0
+  
+  inits <- c(S=S_0,E=E_0,I=I_0,R=R_0, V=V_0)
+  
+  nu    <- 1/3 # incubation period (E -> I), ref: Davies
+  gamma <- 1/5 # recovery period (I -> R), ref: Davies
+  parameters = list(beta=u_constant, nu=nu, gamma=gamma, C=C, v_e=v_e_constant)
+
+  t <- seq(0,150,1)
+
   df <- as.data.frame(lsoda(inits, t, calculate_derivatives, parameters))
   df
 }
