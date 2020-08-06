@@ -15,8 +15,8 @@ df <- read_excel("WPP2019_POP_F07_1_POPULATION_BY_AGE_BOTH_SEXES.xlsx", "ESTIMAT
 # Zimbabwe: ZWE
 # Brazil: BRA
 
-countrycode <- "BRA"
-country <- "Brazil"
+countrycode <- "BEL"
+country <- "Belgium"
 popdata <- df[df$Country == country,]
 popdata <- popdata[popdata$Year == 2020,]
 

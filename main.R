@@ -48,7 +48,7 @@ IFR   <- IFR/100 # as decimal
 # susceptibility with R0 ~ 3 (R0 <- compute_R0(u, C))
 u_constant     <- rep(0.022, 9) # constant # 0.02 for US, 0.022 for Belgium
 #u_var     <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)/32.8 # Ref: Davies
-u_var     <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)/32.8
+u_var     <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)/38.1 # R0 = 2.6 for BEL
 R0 <- compute_R0(u_var, C)
 
 # vaccine efficacy
@@ -174,8 +174,8 @@ for (i in seq(0, 50, by = 1)){
 
 
 # Run multiple R0 ----
-#scale_u <- c(49.5, 45, 43.1, 41.3, 39.6, 38.1, 36.7, 35.4, 34.2, 33, 31.9)
-scale_u <- c(49.5)
+scale_u <- c(49.5, 45, 43.1, 41.3, 39.6, 38.1, 36.7, 35.4, 34.2, 33, 31.9)
+#scale_u <- c(49.5)
 
 list_cases_R0      <- vector(mode = "list")
 list_deaths_R0     <- vector(mode = "list")
@@ -208,22 +208,84 @@ proc.time() - ptm
 list_cases_R0 <- readRDS("list_BEL_overR0_cases.RData")
 list_deaths_R0 <- readRDS("list_BEL_overR0_deaths.RData")
 
-p1 <- plot_over_vax_avail_varyingR0(list_deaths_R0, "deaths", "2.1") + labs(tag = "A")
-p2 <- plot_over_vax_avail_varyingR0(list_deaths_R0, "deaths", "2.6") + labs(tag = "B")
-p3 <- plot_over_vax_avail_varyingR0(list_deaths_R0, "deaths", "3.1") + labs(tag = "C")
+p1 <- plot_over_vax_avail_varyingR0(list_deaths_R0, "deaths", "2.1", 1) + labs(tag = "A ")
+p2 <- plot_over_vax_avail_varyingR0(list_deaths_R0, "deaths", "2.6", 2) + labs(tag = "B")
+p3 <- plot_over_vax_avail_varyingR0(list_deaths_R0, "deaths", "3.1", 3) + labs(tag = "C")
 
-p4 <- plot_over_vax_avail_varyingR0(list_cases_R0, "cases", "2.1") + labs(tag = "D")
-p5 <- plot_over_vax_avail_varyingR0(list_cases_R0, "cases", "2.6") + labs(tag = "E", fontsize = 11)
-p6 <- plot_over_vax_avail_varyingR0(list_cases_R0, "cases", "3.1") + labs(tag = "F")
+p4 <- plot_over_vax_avail_varyingR0(list_cases_R0, "cases", "2.1", 4) + labs(tag = "D ")
+p5 <- plot_over_vax_avail_varyingR0(list_cases_R0, "cases", "2.6", 5) + labs(tag = "E")
+p6 <- plot_over_vax_avail_varyingR0(list_cases_R0, "cases", "3.1", 6) + labs(tag = "F")
 
-grid.arrange(arrangeGrob(p1,p2,p3,p4,p5,p6,
-                         ncol=3, 
-                         widths=c(3, 2.7, 2.6), 
-                         #left = textGrob("Reduction in infections (%)", rot = 90, vjust = 1, gp = gpar(fontsize = 18)), 
-                         bottom = textGrob("Total vaccine supply (% of pop)", vjust = 0, gp = gpar(fontsize = 18))))
+grid.arrange(arrangeGrob(p1, top = textGrob("R0 = 2.1", vjust = 1, gp = gpar(fontsize = 18)),
+                         left = textGrob("Reduction in deaths (%)", rot = 90, hjust = 0.5,
+                                         gp = gpar(fontsize = 20))),
+             arrangeGrob(p2, top = textGrob("R0 = 2.6", vjust = 1, gp = gpar(fontsize = 18))),
+             arrangeGrob(p3, top = textGrob("R0 = 3.1", vjust = 1, gp = gpar(fontsize = 18)),
+                         right = ""),
+             arrangeGrob(p4, left = textGrob("Reduction in infections (%)", rot = 90, hjust = 0.5, 
+                                             gp = gpar(fontsize = 20))),
+             arrangeGrob(p5),
+             arrangeGrob(p6, right = ""),
+             ncol=3, 
+             widths=c(2.6, 2.3, 2.3),
+             heights = c(2.4, 2.5),
+             #left = textGrob("Reduction in infections (%)", rot = 90, vjust = 1, gp = gpar(fontsize = 18)), 
+             bottom = textGrob("Total vaccine supply (% of pop)", vjust = 0.4, gp = gpar(fontsize = 20)))
 
 # RESULTS ----
 # _____________________________________________________________________
+
+# * Paper fig 1 ----
+# export 800*600
+outcome <- "deaths"
+pB <- plot_over_vax_avail(outcome, "None", list_all, list_kids, list_adults, list_elderly, list_twentyplus)
+outcome <- "cases"
+pC <- plot_over_vax_avail(outcome, "None", list_all, list_kids, list_adults, list_elderly, list_twentyplus)
+
+# * * Plot vaccination strategies ----
+p2 <- barplot_vax_strat("all")
+p3 <- barplot_vax_strat("kids")
+p4 <- barplot_vax_strat("adults")
+p5 <- barplot_vax_strat("elderly")
+p6 <- barplot_vax_strat("20+")
+
+# export 1000 * 500
+pA <- grid.arrange(arrangeGrob(p3,p4,p6,p5,p2,
+                         ncol=1, 
+                         widths=c(2.6), 
+                         heights=c(2.3,2.3,2.3,2.3,3.1),
+                         left = textGrob("Age-distribution of vaccines (%)", rot = 90, vjust = 0.5, gp = gpar(fontsize = 24)), 
+                         bottom = textGrob("Age (years)", vjust = 0, gp = gpar(fontsize = 24))))
+
+
+# * Paper fig 2
+outcome <- "deaths"
+plot_over_vax_avail(outcome, "Vaccine efficacy", list_all_v_e_var, list_kids_v_e_var, list_adults_v_e_var, list_elderly_v_e_var, list_twentyplus_v_e_var)
+
+groups <- c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")
+groups <- c("0", "10", "20", "30", "40", "50", "60", "70", "80")
+groups <- c(0,10,20,30,40,50,60,70,80)
+
+df <- data.frame(groups, v_e_var, v_e_constant)
+df$xend <- c(10,20,30,40,50,60,70,80,90)
+
+theme_set(theme_minimal(base_size = 38))
+
+#export as 800 * 900
+ggplot(df, aes(x = groups, y = v_e_var*100, xend = xend, yend = v_e_var*100)) +
+  geom_rect(aes(xmin=50, xmax=60, ymin=0, ymax=100), alpha = 0.02) +
+  geom_segment(size = 1.5, linetype = "dashed")+
+  #geom_point(aes(y = v_e_var*100, group = 1), size = 1.5) +
+  geom_hline(yintercept = 100, size = 1.5) +
+  ylab("Vaccine Efficacy (%)") +
+  scale_y_continuous(expand = c(0,0), limit = c(0, 100.5)) +
+  scale_x_continuous(expand = c(0,0), limit = c(0, 90), breaks = c(0,10,20,30,40,50,60,70,80,90),
+                     labels = c(0,10,20,30,40,50,60,70,80,90)) +
+  theme(panel.grid.minor = element_blank()) +
+  xlab("Age (years)") 
+
+# * Paper Fig 3
+
 
 # * Plot for all ages over time: infected & recovered ----
 compartment <- "I"
@@ -377,22 +439,6 @@ grid.arrange(p1, p5, p2, p6, p3, p7, p4, p8, ncol=2, widths=c(2.3, 2.3))
 # p5 <- barplot_at_finalT(list_elderly$'25', IFR, "elderly", y, nvax = percent_vax*pop_total) 
 # p6 <- barplot_at_finalT(list_twentyplus$'25', IFR, "20+", y, nvax = percent_vax*pop_total)
 
-# * Plot vaccination strategies ----
-p2 <- barplot_vax_strat("all")
-p3 <- barplot_vax_strat("kids")
-p4 <- barplot_vax_strat("adults")
-p5 <- barplot_vax_strat("elderly")
-p6 <- barplot_vax_strat("20+")
-
-grid.arrange(arrangeGrob(p3,
-                         p4,
-                         p6,
-                         p5,
-                         p2,
-                         ncol=1, 
-                         widths=c(2.3), 
-                         left = textGrob("Age-distribution of vaccines", rot = 90, vjust = 1, gp = gpar(fontsize = 18)), 
-                         bottom = textGrob("Age (years)", vjust = 0, gp = gpar(fontsize = 18))))
 
 
 
@@ -431,7 +477,7 @@ grid.arrange(p0, p1, p2, p3, p4, p5,
              left = textGrob("Reduction in Infections (%)", rot = 90, vjust = 1, gp = gpar(fontsize = 22)), 
              bottom = textGrob("Total vaccine supply (% of pop)", vjust = 0, gp = gpar(fontsize = 22)))
 
-# vaccine efficacy tipping point
+# * vaccine efficacy tipping point ----
 v_e_bisection(1, 50)
 
 # * Other Plots ----

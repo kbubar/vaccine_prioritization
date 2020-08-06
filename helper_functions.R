@@ -628,6 +628,7 @@ barplot_vax_strat = function(strategy){
     vax_proportion[groups] <- N_i[groups]/people_to_vax
   }
   age_groups <- c("0","10", "20", "30", "40", "50", "60", "70", "80")
+  vax_proportion <- vax_proportion*100
   
   df <- data.frame(age_groups, vax_proportion, age_demo)
   
@@ -635,18 +636,28 @@ barplot_vax_strat = function(strategy){
   
   # plot
   p <- ggplot(df, aes(x=age_groups)) + 
-    geom_bar(aes(y=age_demo), fill="white",color="black", position="stack", stat="identity") + 
+    #geom_bar(aes(y=age_demo), fill="white",color="black", position="stack", stat="identity") + 
     geom_bar(aes(y=vax_proportion), position="stack", stat="identity", fill = this_color, alpha = 0.8) + 
     xlab("Age group") +
     ggtitle(plot_title) +
-    scale_x_discrete(breaks=c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+"), 
-                     labels=c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")) + 
-    scale_y_continuous(expand = c(0,0), limit = c(0, 0.51), breaks = c(0, .25, .50)) +
-    theme(plot.title = element_text(color = this_color, size = 17),
-          axis.title.x =element_blank(),
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          #axis.text.x  =element_blank(),
-          axis.title.y = element_blank())
+    scale_y_continuous(expand = c(0,0), limit = c(0, 51), breaks = c(0, 25, 50))
+    
+  if (strategy == "all"){
+    p <- p + scale_x_discrete(breaks=c("0","10", "20", "30", "40", "50", "60", "70", "80"), 
+                              labels=c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")) +
+              theme(plot.title = element_text(color = this_color, size = 17),
+                      axis.title.x = element_blank(),
+                      axis.text.x = element_text(angle = 45, hjust = 1),
+                      axis.title.y = element_blank())
+  } else {
+    p <- p + theme(plot.title = element_text(color = this_color, size = 17),
+                   axis.title.x =element_blank(),
+                   axis.text.x = element_blank(),
+                   axis.title.y = element_blank()) + 
+      scale_x_discrete(breaks=c("0","10", "20", "30", "40", "50", "60", "70", "80"), 
+                       labels=c("","","","","","","","",""))  
+  }
+  return(p)
 }
 
 barplot_at_finalT = function(solution_df, IFR, strategy, y, nvax = 0){
@@ -804,7 +815,7 @@ barplot_totaldeaths = function() {
 # Plot over vaccine avaliablity ----
 plot_over_vax_avail = function(outcome, var_name, list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var){
  
-  theme_set(theme_minimal(base_size = 18))
+  theme_set(theme_minimal(base_size = 26))
   
   percent_kids <- round(sum(age_demo[1:2])*100)
   percent_elderly <- round(sum(age_demo[7:9])*100)
@@ -820,8 +831,8 @@ plot_over_vax_avail = function(outcome, var_name, list_all_var, list_kids_var, l
     if (percent_adults < 50) {df[df$strat == "adults" & df$vax_avail > percent_adults, ]$reduction_in_cases = NA}
     if (percent_twentyplus < 50) {df[df$strat == "twentyplus" & df$vax_avail > percent_twentyplus, ]$reduction_in_cases = NA}
     
-    ggplot(df[df$variable == "var", ], aes(x = vax_avail, y = reduction_in_cases, col = strat, fill = strat)) +
-        geom_line(aes(linetype = variable), size = 1.3, alpha = 0.9) +
+    ggplot(df[df$variable == "var",], aes(x = vax_avail, y = reduction_in_cases, col = strat, fill = strat)) +
+        geom_line(aes(linetype = variable), size = 2, alpha = 1) +
         xlab("Total vaccine supply (% of pop)") +
         ylab("Reduction in infections (%)") +
         scale_color_brewer(palette = "Dark2", name = "Allocation Strategy",
@@ -845,8 +856,8 @@ plot_over_vax_avail = function(outcome, var_name, list_all_var, list_kids_var, l
     if (percent_adults < 50){df[df$strat == "adults" & df$vax_avail > percent_adults, ]$reduction_in_deaths = NA}
     if (percent_twentyplus < 50) {df[df$strat == "twentyplus" & df$vax_avail > percent_twentyplus, ]$reduction_in_deaths = NA}
     
-    ggplot(df[df$variable == "var", ], aes(x = vax_avail, y = reduction_in_deaths, col = strat, fill = strat)) +
-        geom_line(aes(linetype = variable), size = 1.3, alpha = 0.9) +
+    ggplot(df, aes(x = vax_avail, y = reduction_in_deaths, col = strat, fill = strat)) +
+        geom_line(aes(linetype = variable), size = 2, alpha = 1) +
         xlab("Total vaccine supply (% of pop)") +
         ylab("Reduction in deaths (%)") +
         scale_color_brewer(palette = "Dark2", name = "Allocation Strategy",
@@ -861,7 +872,7 @@ plot_over_vax_avail = function(outcome, var_name, list_all_var, list_kids_var, l
         scale_x_continuous(expand = c(0,0), limit = c(0, 50)) +#, breaks = c(0,25,50)) +
         # geom_abline(slope = 1, intercept = 0, size = 3, alpha = 0.2) +
         # ggtitle("Optimizing for least deaths") +
-        theme(legend.position = "none") +
+        theme() +#legend.position = "none") +
               #axis.title.x =element_blank(),
               #axis.text.x  = element_blank(), 
               #axis.title.y = element_blank()) +
@@ -869,7 +880,7 @@ plot_over_vax_avail = function(outcome, var_name, list_all_var, list_kids_var, l
   }
 }
 
-plot_over_vax_avail_varyingR0 = function(list_df, outcome, this_R0){
+plot_over_vax_avail_varyingR0 = function(list_df, outcome, this_R0, this_panel){
   R0_temp <- 2.1
   for (i in 1:11){
     R0_char <- as.character(R0_temp)
@@ -891,11 +902,10 @@ plot_over_vax_avail_varyingR0 = function(list_df, outcome, this_R0){
   if (percent_adults < 50) {df[df$strat == "adults" & df$vax_avail > percent_adults, ]$reduction = NA}
   if (percent_twentyplus < 50) {df[df$strat == "twentyplus" & df$vax_avail > percent_twentyplus, ]$reduction = NA}
   
-  theme_set(theme_minimal(base_size = 14))
+  theme_set(theme_minimal(base_size = 12))
   
   p <- ggplot() +
     xlab("Total vaccine supply (% of pop)") +
-    ylab("Reduction in deaths (%)") +
     scale_color_brewer(palette = "Dark2", name = "Allocation Strategy",
                        labels =  c("Young Adults (20-49)", "All Ages", "Elderly (60+)", 
                                    "Children (0-19)", "Adults (20+)", "Optimal")) +
@@ -904,19 +914,41 @@ plot_over_vax_avail_varyingR0 = function(list_df, outcome, this_R0){
                                    "Children (0-19)", "Adults (20+)", "Optimal")) +
     scale_y_continuous(expand = c(0,0), limit = c(0, 101)) +
     scale_x_continuous(expand = c(0,0), limit = c(0, 50)) +#, breaks = c(0,25,50)) +
-    # geom_abline(slope = 1, intercept = 0, size = 1, linetype = "solid", alpha = 0.2) +
-    theme(
-      axis.title.x = element_blank(),           # 1,2,3,4,5,6
-      #axis.title.x = element_text(size = 20), 
-      #axis.title.y = element_blank(),          # 2,3,5,6
-      #axis.title.y = element_text(size = 20),  # 1,4
-      #axis.text.x = element_blank(),           # 1,2,3
-      #axis.text.x = element_text(size = 20),   # 4,5,6
-      #axis.text.y = element_blank(),           # 2,3,5,6
-      #axis.text.y = element_text(size = 20),   # 1,4
-      legend.position = "none") +
     guides(colour = guide_legend(override.aes = list(size=6)))
   
+    if (this_panel == 1){
+      p <- p + theme(axis.title.x = element_blank(),         # 1,2,3,4,5,6
+                    #axis.title.y = element_text(size = 20),  # 1,4
+                    axis.title.y = element_blank(),
+                    axis.text.x = element_blank(),           # 1,2,3
+                    axis.text.y = element_text(size = 17),   # 1,4
+                    legend.position = "none") 
+        #ylab("Reduction in deaths (%)")
+    } else if (this_panel == 2 | this_panel == 3){
+      p <- p + theme(axis.title.x = element_blank(),         # 1,2,3,4,5,6
+                     axis.title.y = element_blank(),         # 2,3,5,6
+                    axis.text.x = element_blank(),           # 1,2,3
+                    axis.text.y = element_blank(),           # 2,3,5,6
+                    legend.position = "none")  
+        #ylab("Reduction in deaths (%)")
+    } else if (this_panel == 4) {
+      p <- p + theme(axis.title.x = element_blank(),          # 1,2,3,4,5,6
+                     #axis.title.y = element_text(size = 20),  # 1,4
+                     axis.title.y = element_blank(),
+                     axis.text.x = element_text(size = 17),   # 4,5,6
+                     axis.text.y = element_text(size = 17),   # 1,4
+                     legend.position = "none")  
+        #ylab("Reduction in infections (%)")
+    } else if (this_panel == 5 | this_panel == 6){
+      p <- p + theme(axis.title.x = element_blank(),          # 1,2,3,4,5,6
+                     axis.title.y = element_blank(),          # 2,3,5,6
+                     axis.text.x = element_text(size = 17),   # 4,5,6
+                     axis.text.y = element_blank(),           # 2,3,5,6
+                     legend.position = "none")   
+        #ylab("Reduction in infections (%)")
+
+    }
+
   strategies <- c("kids","adults", "elderly", "twentyplus", "all")
   j <- 1
   # for (ii in strategies){
@@ -932,16 +964,22 @@ plot_over_vax_avail_varyingR0 = function(list_df, outcome, this_R0){
   for (i in seq(2.1,3.1, by = 0.5)){
     p <- p + geom_line(data = df[df$R0 == paste0(i),], 
                        aes(x = vax_avail, y = reduction, col = strat), 
-                       size = 1.2, alpha = 0.3)
+                       size = 1.1, alpha = 0.25)
   }
   p <- p + geom_line(data = df[df$R0 == this_R0,], 
                      aes(x = vax_avail, y = reduction, col = strat),
                      size = 1.4, alpha = 1)
-  print(p)
+  return(p)
 } 
 
-
 plot_sero_over_vax_avail = function(outcome, strat_to_plot, mycol){
+  if (strategy == "all"){plot_title <- "All Ages"
+  } else if (strategy == "kids"){plot_title <- "Children (0-19)"
+  } else if (strategy == "adults"){plot_title <- "Young Adults (20-49)"
+  } else if (strategy == "elderly"){plot_title <- "Elderly (60+)"
+  } else if (strategy == "20+"){plot_title <- "Adults (20+)"
+  }
+  
   total_cases <- rep(NA, 510)
   total_deaths <- rep(NA, 510)
   count <- 1
@@ -1005,7 +1043,7 @@ plot_sero_over_vax_avail = function(outcome, strat_to_plot, mycol){
   temp <-  c(rep("notest", num_per_list), rep("test", num_per_list))
   variable <- c(rep(temp, num_strategies))
   
-  theme_set(theme_minimal(base_size = 20))
+  theme_set(theme_minimal(base_size = 26))
   
   if (outcome == "cases"){
     baseline_cases_notest <- compute_total_cases(list_all_sero_notest$`0`)
@@ -1040,7 +1078,8 @@ plot_sero_over_vax_avail = function(outcome, strat_to_plot, mycol){
             axis.title.y = element_blank()) +
       scale_y_continuous(expand = c(0,0), limit = c(0, 100)) +
       scale_x_continuous(expand = c(0,0), limit = c(0, 50), breaks = c(0, 25, 50)) +
-      guides(colour = guide_legend(override.aes = list(size=6))) 
+      guides(colour = guide_legend(override.aes = list(size=6))) +
+      ggtitle(plot_title)
   } 
   else if (outcome == "deaths"){
     baseline_deaths_notest <- compute_total_deaths(list_all_sero_notest$`0`)
@@ -1077,7 +1116,8 @@ plot_sero_over_vax_avail = function(outcome, strat_to_plot, mycol){
             axis.text.x  = element_blank(),
             axis.text.y  = element_blank(),
             axis.title.y = element_blank()) +
-      guides(colour = guide_legend(override.aes = list(size=6)))
+      guides(colour = guide_legend(override.aes = list(size=6))) +
+      ggtitle(plot_title)
   }
 }
 
