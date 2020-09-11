@@ -1,8 +1,10 @@
-run_sim = function(C, percent_vax, strategy, u = u_constant, v_e = v_e_constant, frac_age = age_demo, npop = pop_total, N = N_i, nage = num_groups, sero = sero_none, sero_testing = FALSE){
+run_sim = function(C, percent_vax, strategy, u = u_constant, v_e = v_e_constant, 
+                   frac_age = age_demo, npop = pop_total, N = N_i, nage = num_groups, 
+                   sero = sero_none, sero_testing = FALSE){
 
   # Disease Tranmission
-  nu    <- 1/3 # incubation period (E -> I), ref: Davies
-  gamma <- 1/5 # recovery period (I -> R), ref: Davies
+  d_E    <- 1/3 # incubation period (E -> I), ref: Davies
+  d_I <- 1/5 # recovery period (I -> R), ref: Davies
 
   # _____________________________________________________________________
   # INITIAL CONDITIONS ----
@@ -45,7 +47,7 @@ run_sim = function(C, percent_vax, strategy, u = u_constant, v_e = v_e_constant,
     if (sero_testing == FALSE){
       # account for people who were vaccinated and seropositive
       V_0    <- vax_distribution - N*prob_vaccinated*sero
-      #V_0 <- vax_distribution*v_e # all or nothing vaccine
+      #V_0 <- vax_distribution*v_e # all-or-nothing vaccine
     } else if (sero_testing == TRUE){
       # assumes everyone vaccinated was seronegative
       V_0    <- vax_distribution
@@ -59,49 +61,53 @@ run_sim = function(C, percent_vax, strategy, u = u_constant, v_e = v_e_constant,
   
   S_0 <- N - I_0 - V_0 - R_0
   
-  inits <- c(S=S_0,E=E_0,I=I_0,R=R_0, V=V_0)
+  inits <- c(S_0,E_0,I_0,R_0,V_0)
   
   # _____________________________________________________________________
   # NUMERICALLY SOLVE ----
   # _____________________________________________________________________
-  parameters = list(beta=u, nu=nu, gamma=gamma, C=C, v_e=v_e)
-  
-  # if (strategy == "no vax" | strategy == "kids" | strategy == "elderly"){
-  #   t <- seq(0,200,1)
-  #   tfinal <- 200
-  # }
-  # else if (strategy == "all"){
-  #   t <- seq(0,500,1)
-  #   tfinal <- 500
-  # }
-  # else if (strategy == "20+"){
-  #   t <- seq(0,600,1)
-  #   tfinal <- 600
-  # }
-  # else if (strategy == "adults"){
-  #   t <- seq(0,800,1)
-  #   tfinal <- 800
-  # }
+  parameters = list(u=u, d_E=d_E, d_I=d_I, C=C, v_e=v_e)
 
-  t <- seq(0,800,1)
-  tfinal <- 800
-  
+  # t <- seq(0,800,1)
+  # tfinal <- 800
+  # 
+  # df <- as.data.frame(lsoda(inits, t, calculate_derivatives, parameters))
+
+  running = TRUE
+  t <- c(0:50)
   df <- as.data.frame(lsoda(inits, t, calculate_derivatives, parameters))
-  
-  I_tfinal <- sum(df[(tfinal+1),20:28])
-  
-  if (I_tfinal > 1){
-    print("Warning: simulation may not have run long enough")
+  t <- t + 50
+
+  while(running == TRUE){
+    inits <- as.numeric(df[t[1]+1, -(1)])
+    temp <- as.data.frame(lsoda(inits, t, calculate_derivatives, parameters))
+    row.names(temp) <- t+1
+    temp <- temp[-(1),]
+
+    df <- rbind(df, temp)
+
+    I_tfinal <- sum(df[(t+1),20:28])
+    if (I_tfinal < 1){
+      running = FALSE
+    } else {
+      t <- t + 50
+      }
   }
-  
-  df
+
+  names(df) <- c("time", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9",
+                    "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9",
+                    "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8", "I9",
+                    "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9",
+                    "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9")
+
+  return(df)
 }
 
-run_sim_nontransmissionblocking = function(C, percent_vax, strategy, u = u_constant, v_e = v_e_constant, frac_age = age_demo, npop = pop_total, N = N_i, nage = num_groups, sero = sero_none, sero_testing = FALSE){
+run_sim_nontransmissionblocking = function(C, percent_vax, strategy, alpha, omega, u = u_constant, v_e = v_e_constant, frac_age = age_demo, npop = pop_total, N = N_i, nage = num_groups, sero = sero_none, sero_testing = FALSE){
   
   # Disease Tranmission
-  nu    <- 1/3 # incubation period (E -> I), ref: Davies
-  gamma <- 1/5 # recovery period (I -> R), ref: Davies
+  d_E    <- 1/3 # incubation period (E -> I), ref: Davies
+  d_I <- 1/5 # recovery period (I -> R), ref: Davies
   
   # _____________________________________________________________________
   # INITIAL CONDITIONS ----
@@ -143,8 +149,8 @@ run_sim_nontransmissionblocking = function(C, percent_vax, strategy, u = u_const
     
     if (sero_testing == FALSE){
       # account for people who were vaccinated and seropositive
-      V_0    <- vax_distribution - N*prob_vaccinated*sero
-      #V_0 <- vax_distribution*v_e # all or nothing vaccine
+      #V_0    <- vax_distribution - N*prob_vaccinated*sero
+      V_0 <- vax_distribution*v_e # all or nothing vaccine
     } else if (sero_testing == TRUE){
       # assumes everyone vaccinated was seronegative
       V_0    <- vax_distribution
@@ -158,30 +164,13 @@ run_sim_nontransmissionblocking = function(C, percent_vax, strategy, u = u_const
   
   S_0 <- N - I_0 - V_0 - R_0
   
-  inits <- c(S=S_0,E=E_0,I=I_0,R=R_0, VS=V_0, VE = rep(0,nage), VI = rep(0,nage), VR = rep(0,nage))
+  inits <- c(S=S_0,E=E_0,I=I_0,R=R_0, SV=V_0, EV = rep(0,nage), IV = rep(0,nage), RV = rep(0,nage))
   
   # _____________________________________________________________________
   # NUMERICALLY SOLVE ----
   # _____________________________________________________________________
-  parameters = list(beta=u, nu=nu, gamma=gamma, C=C, v_e=v_e)
-  
-  # if (strategy == "no vax" | strategy == "kids" | strategy == "elderly"){
-  #   t <- seq(0,200,1)
-  #   tfinal <- 200
-  # }
-  # else if (strategy == "all"){
-  #   t <- seq(0,500,1)
-  #   tfinal <- 500
-  # }
-  # else if (strategy == "20+"){
-  #   t <- seq(0,600,1)
-  #   tfinal <- 600
-  # }
-  # else if (strategy == "adults"){
-  #   t <- seq(0,800,1)
-  #   tfinal <- 800
-  # }
-  
+  parameters = list(u=u, d_E = d_E, d_I = d_I, C=C, v_e=v_e, alpha = alpha, omega = omega)
+
   t <- seq(0,1000,1)
   tfinal <- 1000
   

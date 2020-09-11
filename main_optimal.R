@@ -55,28 +55,34 @@ get_initial_vax <- function(nvax){
 # SET UP ----
 # _____________________________________________________________________
 # Demographics
-C <- readRDS("C_USA_bytens_all.RData")
-age_demo <- readRDS("age_demographics_USA.RData")
+country <- "BEL"
 
-C_belgium <- readRDS("C_Belgium_bytens_all.RData")
-age_demo_belgium <- readRDS("age_demographics_Belgium.RData")
+C <- readRDS(paste0("C_", country, "_bytens_overall.RData"))
 
-pop_total <- 100000
-N_i <-  pop_total*age_demo_belgium 
+age_demo <- readRDS(paste0("age_demographics_", country,".RData"))
+
+pop_total <- age_demo[10]
+age_demo <- age_demo[1:9]
+
+N_i <-  pop_total*age_demo      
 num_groups <- length(age_demo) # num age groups
 
-IFR   <- c(0.001, 0.001, 0.007, 0.02, 0.06, 0.2, 0.9, 2.4, 10.1) # Ref: Salje
+IFR   <- c(9.530595e-04, 3.196070e-03, 1.071797e-02, 3.594256e-02, 1.205328e-01, 4.042049e-01, 1.355495e+00, 4.545632e+00,
+           1.524371e+01) # Ref: Levin
 IFR   <- IFR/100 # as decimal
 
-# susceptibility with R0 ~ 3 (R0 <- compute_R0(u))
-u_constant     <- rep(0.02, 9) 
-u_var     <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)/32.8 # Ref: Davies
+# susceptibility with R0 ~ 3 (R0 <- compute_R0(u, C))
+u_constant     <- rep(0.022, 9) # constant # 0.02 for US, 0.022 for Belgium
+u_var     <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)/38.1 # R0 = 2.6 for BEL
+R0 <- compute_R0(u_var, C)
 
 # vaccine efficacy
 v_e_constant <- get_v_e(p = 1, y0 = 1, hinge_age = 50)
 v_e_var <- get_v_e(p = 0.5, y0 = 1, hinge_age = 50)
 
-sero_belgium <- c(0.052, 0.052, 0.076, 0.055, 0.063, 0.071, 0.038, 0.042, 0.1) # Ref: Herzog
+# serology 
+sero_none <- rep(0, 9) # no prior immunity
+sero_belgium <- c(0.03760, 0.08981, 0.07008, 0.05616,0.02732, 0.03709, 0.02071, 0.02646,0.03477) # Ref: Herzog
 
 # _____________________________________________________________________
 # RUN SIM ----
@@ -84,8 +90,8 @@ sero_belgium <- c(0.052, 0.052, 0.076, 0.055, 0.063, 0.071, 0.038, 0.042, 0.1) #
 to_minimize <- "deaths"
 percent_vax <- 0.15
 nvax <- percent_vax*pop_total
-#initial_vax <- rep(nvax/num_groups, 9) # start with uniform distribution
-initial_vax <- get_initial_vax(nvax) # start with vaccinating oldest first
+initial_vax <- rep(nvax/num_groups, 9) # start with uniform distribution
+#initial_vax <- get_initial_vax(nvax) # start with vaccinating oldest first
 
 ptm <- proc.time()
 optimal_vax <- cobyla(initial_vax, optimize_sim, hin = constraints,
@@ -107,7 +113,7 @@ ggplot(test, aes(y=vax, x=groups)) +
   #ggtitle("Optimizing for least deaths")
 
 #######
-to_minimize <- "cases"
+to_minimize <- "deaths"
 
 ptm <- proc.time()
 minimize_cases_df <- data.frame(matrix(ncol = 11, nrow = 51))
@@ -115,8 +121,8 @@ colnames(minimize_cases_df) <- c("Percent_vax", "0-9", "10-19", "20-29", "30-39"
 
 list_optimal <- vector(mode = "list")
 
-for (j in 1:10){
-  for (i in 45:50){
+for (j in 1:8){
+  for (i in 0:42){
     percent_vax <- i/100
     nvax <- percent_vax*pop_total
     # uniform with noise
@@ -149,21 +155,21 @@ proc.time() - ptm
 # df_5000_end <- minimize_cases_df[27:51,]
 # df_5000<- rbind(df_5000_beginning, df_5000_end)
 
-saveRDS(list_optimal, "optimal_belgium_40_50_list_cases7.RData")
+saveRDS(list_optimal, "optimal_BEL_deaths_newIFR_8x_6.RData")
 
 # _____________________________________________________________________
 # ANALYZE OPTIMAL ACROSS VAX AVAIALBLE ####
 # _____________________________________________________________________
-simplemodel_cases <- readRDS("optimal_belgium_u_var_best.RData")
+simplemodel_cases <- readRDS("optimal_BEL_cases_50x.RData")
 
-simplemodel_deaths <- readRDS("optimal_simple_initialtooldest_deaths.RData")
+simplemodel_deaths <- readRDS("optimal_BEL_deaths_newIFR.RData")
 
 # calculate percent reduction in cases
 total_cases <- c(simplemodel_cases$Percent_infected)
 baseline_cases_C <- simplemodel_cases$Percent_infected[1]
 
 num_per_list <- 51
-baseline_cases <- c(rep(baseline_cases_C, num_per_list) )
+baseline_cases <- c(rep(baseline_cases_C, num_per_list))
 reduction_in_cases <- (1-(total_cases/baseline_cases))*100
 
 # calculate percent reduction in deaths
@@ -181,7 +187,7 @@ variable <- c(rep("var", num_per_list))#, rep("var", num_per_list))
 optimal_df_C <- data.frame(vax_avail, strat, reduction_in_cases, variable)
 optimal_df_C <- data.frame(vax_avail, strat, reduction_in_deaths, variable)
 
-ggplot(optimal_df_C, aes(x = vax_avail, y = reduction_in_cases, col = strat, fill = strat)) +
+ggplot(optimal_df_C, aes(x = vax_avail, y = reduction_in_deaths, col = strat, fill = strat)) +
   geom_abline(slope = 1, intercept = 0, size = 3, alpha = 0.2) +
   geom_line(aes(linetype = variable), size = 2, alpha = 0.9) +
   xlab("Vaccine available (% of total pop)") +
@@ -197,31 +203,8 @@ ggplot(optimal_df_C, aes(x = vax_avail, y = reduction_in_cases, col = strat, fil
   xlim(0,50) +
   theme(legend.position = "none")
 
-#### Stacked bar chart
-r <- c(11, 21, 31)
-new_df <- simplemodel_cases[r, ]
+### Bar chart
 
-pal <- brewer.pal(3, "RdBu")
-
-new_df <- new_df %>%
-  select(Percent_vax, "0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+") %>%
-  gather(key = "age_group", value = "num", -Percent_vax)
-
-ggplot(new_df, aes(y=num, x=age_group, fill = as.factor(Percent_vax), group = as.factor(Percent_vax))) + 
-  geom_bar(position = "dodge", stat = "identity") +
-  xlab("Age group") + 
-  ylab("Vaccinated\n(% of age group)")+
-  ylim(0, 101) + 
-  scale_fill_discrete(name = "Vaccine\nAvaliable", labels = c("10%", "20%", "30%")) 
-  #scale_x_discrete(breaks=c("0-9","20-29", "40-49", "60-69", "80+")) 
-  #scale_fill_manual(pal)
-
-# new_df[5,3] <- new_df[5,3] - new_df[4,3]
-# new_df[6,3] <- new_df[6,3] - new_df[5,3] - new_df[4,3]
-# new_df[9,3] <- new_df[9,3] - new_df[8,3]
-# new_df[11,3] <- new_df[11,3] - new_df[10,3]
-# new_df[12,3] <- new_df[12,3] - new_df[11,3] - new_df[10,3]
-# new_df[15,3] <- new_df[15,3] - new_df[14,3]
 
 # green: "#00BA38"
 # blue: "#619CFF"
@@ -240,3 +223,66 @@ ggplot(new_df[new_df$Percent_vax == 30,], aes(y=num, x=age_group, fill = as.fact
         axis.title.x =element_blank())
         #axis.title.y = element_blank())
 #scale_fill_manual(pal)
+
+dist_of_vax <- matrix(nrow = 51, ncol = 9)
+
+for (i in 1:51){
+  tot <- sum(N_i*cases_best[i, 2:10])
+  dist_of_vax[i,] <- as.numeric(((N_i*cases_best[i, 2:10])/tot)*100)
+}
+
+dist_of_vax <- as.data.frame(dist_of_vax)
+colnames(dist_of_vax) <- c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")
+
+dist_of_vax$Percent_vax <- 0:50
+
+new_df <- dist_of_vax %>%
+  select(Percent_vax, "0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+") %>%
+  gather(key = "age_group", value = "num", -Percent_vax)
+
+p1 <- ggplot(new_df[new_df$Percent_vax == 10,], aes(y=num, x=age_group, fill = as.factor(Percent_vax), group = as.factor(Percent_vax))) + 
+  geom_bar(position = "stack", stat = "identity", fill = "#E6AB02") +
+  #xlab("Age group") + 
+  #ylab("Age distribution of vaccines (%)")+
+  theme_classic(base_size = 26) +
+  scale_x_discrete(breaks=c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+"), 
+                   labels=c("", "", "", "", "", "", "", "", "")) +
+  scale_y_continuous(expand = c(0,0), limits = c(0, 75), breaks = c(0,25,50,75)) +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.x =element_blank(),
+        axis.title.y =element_blank())
+
+p2 <- ggplot(new_df[new_df$Percent_vax == 20,], aes(y=num, x=age_group, fill = as.factor(Percent_vax), group = as.factor(Percent_vax))) + 
+  geom_bar(position = "stack", stat = "identity", fill = "#E6AB02") +
+  #xlab("Age group") + 
+  #ylab("Age distribution of vaccines (%)")+
+  theme_classic(base_size = 26) +
+  scale_x_discrete(breaks=c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+"), 
+                   labels=c("", "", "", "", "", "", "", "", "")) +
+  scale_y_continuous(expand = c(0,0), limits = c(0, 75), breaks = c(0,25,50,75)) +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.x =element_blank(),
+        axis.title.y =element_blank())
+
+p3 <- ggplot(new_df[new_df$Percent_vax == 30,], aes(y=num, x=age_group, fill = as.factor(Percent_vax), group = as.factor(Percent_vax))) + 
+  geom_bar(position = "stack", stat = "identity", fill = "#E6AB02") +
+  #xlab("Age group") + 
+  #ylab("Age distribution of vaccines (%)")+
+  theme_classic(base_size = 26) +
+  scale_x_discrete(breaks=c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+"), 
+                   labels=c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")) +
+  #scale_x_discrete(breaks = NULL) +
+  scale_y_continuous(expand = c(0,0), limits = c(0, 75), breaks = c(0,25,50,75)) +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.x =element_blank(), 
+        axis.title.y =element_blank())
+
+# export as 600 * 1200
+grid.arrange(p1, p2, p3, 
+             ncol=1, widths=c(2.3),
+             heights = c(2.3,2.3,2.8),
+             left = textGrob("Age distribution of vaccines (%)", rot = 90, vjust = 0.5, hjust = 0.35, gp = gpar(fontsize = 26)),
+             bottom = textGrob("Age (years)", vjust = 0, gp = gpar(fontsize = 26)))
