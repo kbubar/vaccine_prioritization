@@ -162,8 +162,8 @@ saveRDS(list_optimal, "optimal_BEL_deaths_newIFR_8x_6.RData")
 # _____________________________________________________________________
 simplemodel_cases <- readRDS("optimal_BEL_cases_50x.RData")
 
-simplemodel_deaths <- readRDS("optimal_BEL_deaths_newIFR.RData")
-
+simplemodel_deaths <- readRDS("optimal_BEL_deaths_50x.RData")
+simplemodel_deaths <- readRDS("optimal_BEL_deaths_newIFR_x33.RData")
 # calculate percent reduction in cases
 total_cases <- c(simplemodel_cases$Percent_infected)
 baseline_cases_C <- simplemodel_cases$Percent_infected[1]

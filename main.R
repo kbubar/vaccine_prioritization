@@ -29,7 +29,7 @@ source("helper_functions.R")
 # SET UP ----
 # _____________________________________________________________________
 # Demographics
-country <- "BEL"
+country <- "CHN"
 
 C <- readRDS(paste0("C_", country, "_bytens_overall.RData"))
 
@@ -41,15 +41,15 @@ age_demo <- age_demo[1:9]
 N_i <-  pop_total*age_demo      
 num_groups <- length(age_demo) # num age groups
 
-#IFR   <- c(0.001, 0.001, 0.005, 0.02, 0.05, 0.2, 0.7, 1.9, 8.3) # Ref: Salje
 IFR   <- c(9.530595e-04, 3.196070e-03, 1.071797e-02, 3.594256e-02, 1.205328e-01, 4.042049e-01, 1.355495e+00, 4.545632e+00,
            1.524371e+01) # Ref: Levin
 IFR   <- IFR/100 # as decimal
 
+YLL_vec <- readRDS(paste0("yll_vec_", country, ".RData"))
+
 # susceptibility with R0 ~ 3 (R0 <- compute_R0(u, C))
-u_constant     <- rep(0.0154, 9) # constant # 0.0154 for Belgium
-#u_var     <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)/32.8 # Ref: Davies
-u_var     <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)/38.1 # R0 = 2.6 for BEL
+#u_constant     <- rep(0.0154, 9) # constant # 0.0154 for Belgium
+u_var     <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)/38.1 # R0 = 2.6 for BEL, Ref: Davies
 R0 <- compute_R0(u_constant, C)
 
 # vaccine efficacy
@@ -66,7 +66,8 @@ sero_NY <- c(0.32, 0.3129, 0.249, 0.249, 0.264, 0.279, 0.2575, 0.2215, 0.207)
 # RUN SIM ----
 # _____________________________________________________________________
 # strategy options: "no vax", "all", "kids", "adults", "elderly"
-# df_novax <- run_sim(C, 0, "no vax", u_constant, v_e_constant) DELETE LATER, MAY BE
+# df_novax <- run_sim(C, 0, "no vax", u_var, v_e_constant)
+# saveRDS(df_novax, "US_sim_novax.RData")
 
 # * Simple model (US: everything constant besides IFR) ----
 list_all      <- vector(mode = "list")
@@ -78,11 +79,11 @@ list_twentyplus   <- vector(mode = "list")
 ptm <- proc.time()
 for (i in seq(0, 50, by = 1)){
   j <- i/100
-  list_all[[paste0(i)]] <- run_sim(C, percent_vax = j, strategy = "all", u = u_constant)
-  list_kids[[paste0(i)]] <- run_sim(C, j, "kids", u_constant)
-  list_adults[[paste0(i)]] <- run_sim(C, j, "adults", u_constant)
-  list_elderly[[paste0(i)]] <- run_sim(C, j, "elderly", u_constant)
-  list_twentyplus[[paste0(i)]] <- run_sim(C, j, "20+", u_constant)
+  list_all[[paste0(i)]] <- run_sim(C, percent_vax = j, strategy = "all", u = u_var)
+  list_kids[[paste0(i)]] <- run_sim(C, j, "kids", u_var)
+  list_adults[[paste0(i)]] <- run_sim(C, j, "adults", u_var)
+  list_elderly[[paste0(i)]] <- run_sim(C, j, "elderly", u_var)
+  list_twentyplus[[paste0(i)]] <- run_sim(C, j, "20+", u_var)
 }
 proc.time() - ptm
 
@@ -562,6 +563,7 @@ barplot_totaldeaths()
 # * Plot total cases and deaths ----
 outcome <- "cases"
 outcome <- "deaths"
+outcome <- "YLL"
 
 plot_over_vax_avail(outcome, "None", list_all, list_kids, list_adults, list_elderly, list_twentyplus)
 

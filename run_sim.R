@@ -62,7 +62,7 @@ run_sim = function(C, percent_vax, strategy, u = u_constant, v_e = v_e_constant,
   S_0 <- N - I_0 - V_0 - R_0
   
   inits <- c(S_0,E_0,I_0,R_0,V_0)
-  
+
   # _____________________________________________________________________
   # NUMERICALLY SOLVE ----
   # _____________________________________________________________________
@@ -184,6 +184,66 @@ run_sim_nontransmissionblocking = function(C, percent_vax, strategy, alpha, omeg
   
   df
 }
+
+run_sim_WHOstrat = function(C, percent_vax, V_0, u = u_constant, v_e = v_e_constant, 
+                   frac_age = age_demo, npop = pop_total, N = N_i, nage = num_groups, 
+                   sero = sero_none, sero_testing = FALSE){
+  
+  # Disease Tranmission
+  d_E    <- 1/3 # incubation period (E -> I), ref: Davies
+  d_I <- 1/5 # recovery period (I -> R), ref: Davies
+  
+  E_0    <- rep(0,nage)
+  R_0    <- N * sero
+  
+  # initial I: 1 in each age group unless everyone is vaccinated and/or sero positive
+  I_0 <- rep(0, nage)
+  I_0[(N - R_0 - V_0) > 1] <- 1
+  
+  S_0 <- N - I_0 - V_0 - R_0
+  
+  inits <- c(S_0,E_0,I_0,R_0,V_0)
+  
+  # _____________________________________________________________________
+  # NUMERICALLY SOLVE ----
+  # _____________________________________________________________________
+  parameters = list(u=u, d_E=d_E, d_I=d_I, C=C, v_e=v_e)
+  
+  # t <- seq(0,800,1)
+  # tfinal <- 800
+  # 
+  # df <- as.data.frame(lsoda(inits, t, calculate_derivatives, parameters))
+  
+  running = TRUE
+  t <- c(0:50)
+  df <- as.data.frame(lsoda(inits, t, calculate_derivatives, parameters))
+  t <- t + 50
+  
+  while(running == TRUE){
+    inits <- as.numeric(df[t[1]+1, -(1)])
+    temp <- as.data.frame(lsoda(inits, t, calculate_derivatives, parameters))
+    row.names(temp) <- t+1
+    temp <- temp[-(1),]
+    
+    df <- rbind(df, temp)
+    
+    I_tfinal <- sum(df[(t+1),20:28])
+    if (I_tfinal < 1){
+      running = FALSE
+    } else {
+      t <- t + 50
+    }
+  }
+  
+  names(df) <- c("time", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9",
+                 "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9",
+                 "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8", "I9",
+                 "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9",
+                 "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9")
+  
+  return(df)
+}
+
 
 run_sim_later_vax <- function(t_infected, strategy, percent_vax, sero_testing = FALSE, 
                               npop = pop_total, N = N_i, nage = num_groups) {

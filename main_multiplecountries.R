@@ -35,8 +35,11 @@ source("helper_functions.R")
 # India: IND
 # Spain: ESP
 # Zimbabwe: ZWE
-# Brazil: BRA 
-country <- "BEL"
+# Brazil: BRA
+# China: CHN
+# South Africa: ZAF
+
+country <- "ZAF"
 
 C <- readRDS(paste0("C_", country, "_bytens_overall.RData"))
 age_demo <- readRDS(paste0("age_demographics_", country,".RData"))
@@ -61,7 +64,7 @@ sero_none <- rep(0, 9) # no prior immunity
 # _____________________________________________________________________
 # RUN SIM ----
 # _____________________________________________________________________
-v_e <- c(.75, 0.5)
+v_e <- c(0.75, 0.5)
 
 ptm <- proc.time()
 for (k in v_e){

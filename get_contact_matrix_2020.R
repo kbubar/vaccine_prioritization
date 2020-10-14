@@ -91,8 +91,11 @@ add_80bin <- function(C_bytens){
 # Spain: ESP
 # Zimbabwe: ZWE
 # Brazil: BRA
+# China: CHN
+# South Africa: ZAF
+# Poland: POL
 
-country <- "BEL"
+country <- "POL"
 setting <- "overall" #overall, rural or urban
 #* C for all locations (home, work, school & other) ----
 df <- read.csv("synthetic_contacts_2020.csv")

@@ -11,7 +11,7 @@ optimize_sim = function(vax_vec) {
   frac_age<- age_demo
   npop    <- pop_total
   N       <- N_i
-  sero    <- sero_belgium
+  sero    <- sero_none # sero_belgium
   nage    <- num_groups
   d_E      <- 1/3 # incubation period (E -> I), ref: Davies
   d_I   <- 1/5 # recovery period (I -> R), ref: Davies
