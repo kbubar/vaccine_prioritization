@@ -53,7 +53,8 @@ cases_best <- as.data.frame(cases_best)
 colnames(cases_best) <- c("Percent_vax", "0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+", "Percent_infected")
 
 cases_best[cases_best > 100] <- 100
-saveRDS(cases_best, "optimal_BEL_deaths_newIFR_x33.RData")
+#saveRDS(cases_best, "optimal_BEL_deaths_newIFR_x33.RData")
+
 # _____________________________________________________________________
 # IMPORT ----
 # _____________________________________________________________________
@@ -75,27 +76,8 @@ ggplot(new_df[new_df$Percent_vax < 43,], aes(x = Percent_vax, y = num, col = age
   # geom_label(aes(x = new_df[50,]$Percent_vax + 2, y = new_df[50,]$num, 
   #                label = new_df[50,]$age_group, fill = new_df[50,]$age_group),
   #            size = 6, fontface = "bold") +
-  # geom_label(aes(x = new_df[101,]$Percent_vax + 2, y = new_df[101,]$num,
-  #                label = new_df[101,]$age_group, fill = new_df[101,]$age_group),
-  #            size = 6, fontface = "bold") +
-  # geom_label(aes(x = new_df[152,]$Percent_vax + 2, y = new_df[152,]$num,
-  #                label = new_df[152,]$age_group, fill = new_df[152,]$age_group),
-  #            size = 6, fontface = "bold") +
-  # geom_label(aes(x = new_df[203,]$Percent_vax + 2, y = new_df[203,]$num - 1,
-  #                label = new_df[203,]$age_group, fill = new_df[203,]$age_group),
-  #            size = 6, fontface = "bold") +
-  # geom_label(aes(x = new_df[254,]$Percent_vax + 2, y = new_df[254,]$num - 7,
-  #                label = new_df[254,]$age_group, fill = new_df[254,]$age_group),
-  #            size = 6, fontface = "bold", colour = "white") +
-  # geom_label(aes(x = new_df[305,]$Percent_vax + 2, y = new_df[305,]$num,
-  #                label = new_df[305,]$age_group, fill = new_df[305,]$age_group),
-  #            size = 6, fontface = "bold", colour = "white") +
-  # geom_label(aes(x = new_df[356,]$Percent_vax + 2, y = new_df[356,]$num,
-  #                label = new_df[356,]$age_group, fill = new_df[356,]$age_group),
-  #            size = 6, fontface = "bold", colour = "white") +
   scale_color_manual(values = pal) +
   scale_fill_manual(values = pal) +
-  # ggtitle("Optimal allocation for minimizing cases") +
   theme(legend.position = "none") +
   scale_y_continuous(expand = c(0,0), limit = c(0, 100)) +
   scale_x_continuous(expand = c(0,0), limit = c(0, 42), breaks = c(0, 10, 20, 30, 40))

@@ -95,7 +95,7 @@ add_80bin <- function(C_bytens){
 # South Africa: ZAF
 # Poland: POL
 
-country <- "POL"
+country <- "ZWE"
 setting <- "overall" #overall, rural or urban
 #* C for all locations (home, work, school & other) ----
 df <- read.csv("synthetic_contacts_2020.csv")
@@ -123,6 +123,12 @@ for (i in contactor){
     C[i,j] = temp$mean_number_of_contacts
   }
 }
+
+heatmap(C, NA, NA, scale = "column", xlab = "Age of Individual", ylab = "Age of Contact",
+        cexRow = 1.5, cexCol = 1.5, 
+        labRow = c(NA, 10, NA, 20, NA, 30, NA, 40, NA, 50, NA, 60,  NA, 70, NA, 80),
+        labCol = c(NA, 10, NA, 20, NA, 30, NA, 40, NA, 50, NA, 60,  NA, 70, NA, 80))
+
 
 C_bytens <- convert_bins_5to10(C)
 heatmap(C_bytens, NA, NA, scale = "column", xlab = "Age of Individual", ylab = "Age of Contact")

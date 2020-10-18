@@ -85,8 +85,9 @@ sero_none <- rep(0, 9) # no prior immunity
 sero_belgium <- c(0.03760, 0.08981, 0.07008, 0.05616,0.02732, 0.03709, 0.02071, 0.02646,0.03477) # Ref: Herzog
 
 # _____________________________________________________________________
-# RUN SIM ----
+# RUN OPTIMAL SIM ----
 # _____________________________________________________________________
+# * RUN OPTIMIZATION CODE FOR ONE PERCENT_VAX ----
 to_minimize <- "deaths"
 percent_vax <- 0.15
 nvax <- percent_vax*pop_total
@@ -112,7 +113,7 @@ ggplot(test, aes(y=vax, x=groups)) +
   scale_x_discrete(breaks=c("0-9","20-29", "40-49", "60-69", "80+"))
   #ggtitle("Optimizing for least deaths")
 
-#######
+# * RUN OPTIMIZATION CODE OVER MULTIPLE PERCENT_VAX ----
 to_minimize <- "deaths"
 
 ptm <- proc.time()
@@ -130,17 +131,7 @@ for (j in 1:8){
     initial_vax <- rep(nvax/num_groups, 9) + noise
     
     #initial_vax <- get_initial_vax(nvax)
-    
-    # # greedy
-    # if (i == 12){
-    #   # noise <- runif(num_groups, -0.03*nvax, 0.03*nvax)
-    #   previous_step <- rep(0, 9)
-    #   initial_vax <- rep(nvax/num_groups, 9)
-    # } else {
-    #   previous_step <- optimal_vax$par
-    #   temp <- 1/100*pop_total
-    #   initial_vax <- previous_step + rep(temp/num_groups, 9)
-    # }
+
     optimal_vax <- cobyla(initial_vax, optimize_sim, hin = constraints,
                           nl.info = FALSE, control = list(xtol_rel = 1e-8, maxeval = 5000))
     minimize_cases_df[i+1, 2:10] <- round(optimal_vax$par/N_i * 100, 2)
@@ -152,10 +143,7 @@ for (j in 1:8){
 }
 proc.time() - ptm
 
-# df_5000_end <- minimize_cases_df[27:51,]
-# df_5000<- rbind(df_5000_beginning, df_5000_end)
-
-saveRDS(list_optimal, "optimal_BEL_deaths_newIFR_8x_6.RData")
+#saveRDS(list_optimal, "optimal_BEL_deaths_newIFR_8x_6.RData")
 
 # _____________________________________________________________________
 # ANALYZE OPTIMAL ACROSS VAX AVAIALBLE ####
@@ -203,9 +191,7 @@ ggplot(optimal_df_C, aes(x = vax_avail, y = reduction_in_deaths, col = strat, fi
   xlim(0,50) +
   theme(legend.position = "none")
 
-### Bar chart
-
-
+### Bar chart for paper figure 4
 # green: "#00BA38"
 # blue: "#619CFF"
 # gold: "#E6AB02"

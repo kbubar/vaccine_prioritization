@@ -191,7 +191,6 @@ compute_total_cases = function(df){
   }
   
   tot_infections <- sum(infections)/pop_total * 100
-  #tot_infections <- round(tot_infections, 1)
 }
 
 compute_total_deaths = function(df){
@@ -586,94 +585,6 @@ plot_allages_onestrategy =function(df, compartment){
   }
 }
 
-plot_totalinfections_sero =function(df_baseline, df_sero_notest, df_sero_test, compartment){
-  # INPUTS:
-  # df: simulation to plot
-  # compartment: character of compartment to plot i.e. "I", "R"
-  #
-  # OUTPUT:
-  # p: ggplot object of plot
-  
-  # make new df for plotting
-  if (compartment == "I"){
-    total <- data.frame(time = 0:150,
-                        baseline = apply(df_baseline[20:28], 1, sum), 
-                        sero_notest = apply(df_sero_notest[20:28], 1, sum),
-                        sero_test = apply(df_sero_test[20:28], 1, sum))
-  } else if (compartment == "R"){
-    total <- data.frame(time = 0:150,
-                        baseline = apply(df_baseline[29:37], 1, sum), 
-                        sero_notest = apply(df_sero_notest[29:37], 1, sum),
-                        sero_test = apply(df_sero_test[29:37], 1, sum))
-  }
-  
-  new_df <- total %>%
-    select(time, baseline, sero_notest, sero_test) %>%
-    gather(key = "scenario", value = "num", -time)
-  
-  # Add col for percent infected & recovered
-  new_df$percent <- new_df$num/pop_total*100
-  
-  # Plot
-  theme_set(theme_minimal(base_size = 20))
-  
-  # string_to_add <- paste0("Total infected: ", compute_total_cases(df), "%")
-  
-  # Create a text
-  # grob <- grobTree(textGrob(string_to_add, x=0.5,  y=0.95, hjust=0,
-  #                           gp=gpar(col="white", fontsize=13, fontface="bold")))
-  
-  # Plot
-  p <- ggplot(new_df, aes(x = time, y = percent)) + 
-    geom_line(aes(color = scenario), size = 2.5) +
-    xlab("Time") +
-    guides(colour = guide_legend(override.aes = list(size=6))) +
-  #   annotation_custom(grob) +
-    scale_color_manual(values = wes_palette("GrandBudapest1", n = 3), name = "Scenario", 
-                        labels =  c("Baseline\n(no seropositive)\n", "Seropositive\nno testing\n", "Seropositive\nwith testing"))
-  # 
-  if (compartment == "I") {
-    p <- p + ylab("Percent Infected") + ylim(0, 16)
-  } else if (compartment == "R") {
-    p <- p + ylab("Percent Recovered") + ylim(0,1)
-  }
-}
-
-plot_oneage_allstrategy = function(col_name, age_group_num) {
-  # INPUTS:
-  # col_name: "I2" == infected, age group 2
-  # age_group_num: age group of interest, 1 = 0-9, 2 = 10-18, ...
-  #
-  # OUTPUT:
-  # p: ggplot object plotting all strats for one age group & one compartment
-  
-  nstrat <- 3
-  new_df <- data.frame(matrix(ncol = nstrat+1, nrow = dim(df_novax)[1]))
-  colnames(new_df) <- c("time", "no_vax", "everyone", "kids")
-  new_df$time <- df_novax$time
-  
-  # Make sure col of interest are stored as vectors
-  new_df$no_vax <- unlist(as.data.frame(df_novax)[col_name]/N[age_group_num])
-  new_df$everyone <- unlist(as.data.frame(df_prop)[col_name]/N[age_group_num])
-  new_df$kids <- unlist(as.data.frame(df_propkids)[col_name]/N[age_group_num])
-  
-  new_df <- new_df %>%
-    select(time, no_vax, everyone, kids) %>%
-    gather(key = "strat", value = "percent", -time)
-  
-  theme_set(theme_minimal(base_size = 15))
-  
-  p <- ggplot(new_df, aes(x = time, y = percent)) + 
-    geom_line(aes(color = strat), size = 2) +
-    xlab("Time") +
-    scale_color_brewer(palette = "Dark2", name = "Scenario", 
-                       labels =  c("Everyone", "Just Kids", "No vaccines"))
-  
-  if (substr(col_name, 1, 1) == "I"){
-    p <- p + ylab("Percent Infected") + ylim(0, 0.4)
-  }
-}
-
 # Bar plots ----
 barplot_vax_strat = function(strategy){
   if (strategy == "no vax"){
@@ -744,169 +655,17 @@ barplot_vax_strat = function(strategy){
   return(p)
 }
 
-barplot_at_finalT = function(solution_df, IFR, strategy, y, nvax = 0){
-  if (strategy == "no vax"){
-    vaccinated <- rep(0,num_groups) * 100
-    this_color <- "#808080"
-    plot_title <- "No Vaccines"
-  } 
-  else {
-    if (strategy == "all"){
-      groups <- 1:9
-      this_color <- col_all
-      plot_title <- "All Ages"
-      sub_title <- ""
-    } 
-    else if (strategy == "kids"){
-      groups <- 1:2
-      this_color <- col_kids
-      plot_title <- "Children (0-19)"
-      sub_title <- ""
-    } 
-    else if (strategy == "adults"){
-      groups <- 3:5
-      this_color <- col_youngadults
-      plot_title <- "Young Adults (20-49)"
-      sub_title <- "(20-49)"
-    } 
-    else if (strategy == "elderly"){
-      groups <- 7:9
-      this_color <- col_elderly
-      plot_title <- "Elderly (60+)"
-      sub_title <- "(60+)"
-    }
-    else if (strategy == "20+"){
-      groups <- 3:9
-      this_color <- col_adults
-      plot_title <- "Adults (20+)"
-      sub_title <- "(20+)"
-    }
-    people_to_vax <- sum(N_i[groups])
-    
-    vax_proportion <- rep(0, num_groups)
-    vax_proportion[groups] <- N_i[groups]/people_to_vax
-    
-    vax_distribution <- nvax*vax_proportion
-    vax_distribution[vax_distribution > N_i] <- N_i[vax_distribution > N_i]
-    vaccinated <- vax_distribution/N_i * 100
-  }
-  
-  infections <- rep(0,num_groups)
-  deaths <- rep(0, num_groups)
-  final_S <- rep(0, num_groups)
-  
-  R_index <- 29 # col number for R1
-
-  for (i in 1:num_groups) {
-    deaths[i] <- max(solution_df[R_index])*IFR[i]/N_i[i]*100
-    infections[i] <- max(solution_df[R_index]) # total infected (including dead)
-    # infections[i] <- max(solution_df[R_index])*(1-IFR[i])/N_i[i] # total infected (excluding dead)
-    final_S[i] <- solution_df[(max(t) + 1), (i + 1)]/N_i[i]
-    R_index <- R_index + 1
-  }
-  
-  #age_groups <- c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")
-  age_groups <- c("0","10", "20", "30", "40", "50", "60", "70", "80")
-  
-  df <- data.frame(age_groups, final_S, deaths, infections, vaccinated)
-  
-  new_df <- df %>%
-    # select(age_groups, infections, deaths, vaccinated, final_S) %>%
-    select(age_groups, all_of(y)) %>%
-    gather(key = "type", value = "num", -age_groups)
-  
-  theme_set(theme_classic(base_size = 20))
-  
-  # plot
-  p <- ggplot(new_df, aes(fill=type, y=num, x=age_groups)) + 
-    geom_bar(position="stack", stat="identity", fill = this_color) + 
-    xlab("Age group") +
-    scale_x_discrete(breaks=c("0","10", "20", "30", "40", "50", "60","70", "80"), 
-                     labels=c("0","", "20", "", "40", "", "60","", "80")) + 
-    scale_y_continuous(expand = c(0,0), limit = c(0, 100), breaks = c(0, 50, 100)) +
-    theme(plot.subtitle = element_text(size = 9, face = "italic", hjust = 1),
-          plot.title = element_text(size = 17),
-          axis.title.x =element_blank(), 
-          axis.title.y = element_blank())
-  
-  if (y == "infections") {
-      string_to_add <- paste0("Total infected: ", round(compute_total_cases(solution_df),2), "%")
-
-      p <- p + 
-        #ylim(0, 100) + 
-        ylab("Infected (%)") + 
-        # labs(title = plot_title, subtitle = string_to_add)
-        labs(subtitle = string_to_add)
-    } 
-  else if (y == "deaths") {
-      string_to_add <- paste0("Total deaths: ", round(compute_total_deaths(solution_df),2), "%")
-      
-      p <- p + 
-        ylim(0, 8) + 
-        ylab("Deaths (%)") + 
-        # labs(title = plot_title, subtitle = string_to_add)
-        labs(subtitle = string_to_add)
-    } 
-  else if (y == "vaccinated"){
-      p <- p + 
-        #ylim(0, 100) + 
-        ylab("Vaccinated (%)") 
-        #labs(title = plot_title)
-  }
-  p # output ggplot
-}
-
-barplot_totalcases = function() {
-  novax <- compute_total_cases(df_novax)
-  everyone_05 <- compute_total_cases(df_prop_05)
-  kids_05 <- compute_total_cases(df_propkids_05)
-  adults_05 <- compute_total_cases(df_propadults_05)
-  everyone_10 <- compute_total_cases(df_prop_10)
-  kids_10 <- compute_total_cases(df_propkids_10)
-  adults_10 <- compute_total_cases(df_propadults_10)
-  
-  tot_cases <- c(novax, everyone_05, kids_05, adults_05, everyone_10, kids_10, everyone_10)
-  groups <- c("No vax", "Everyone", "Kids", "Adults", "Everyone", "Kids", "Adults")
-  vax_avaliable <- c("None", "5%", "5%", "5%", "10%", "10%", "10%")
-  df <- data.frame(groups, tot_cases, vax_avaliable)
-  
-  ggplot(df, aes(fill = vax_avaliable, x=groups, y=tot_cases)) + 
-       geom_bar(position = "dodge", stat = "identity") + 
-    xlab("Strategy") + 
-    ylab("Total infected (%)")
-}
-
-barplot_totaldeaths = function() {
-  novax <- compute_total_deaths(df_novax)
-  everyone_05 <- compute_total_deaths(df_prop_05)
-  kids_05 <- compute_total_deaths(df_propkids_05)
-  adults_05 <- compute_total_deaths(df_propadults_05)
-  everyone_10 <- compute_total_deaths(df_prop_10)
-  kids_10 <- compute_total_deaths(df_propkids_10)
-  adults_10 <- compute_total_deaths(df_propadults_10)
-  
-  tot_deaths <- c(novax, everyone_05, kids_05, adults_05, everyone_10, kids_10, everyone_10)
-  groups <- c("No vax", "Everyone", "Kids", "Adults", "Everyone", "Kids", "Adults")
-  vax_avaliable <- c("None", "5%", "5%", "5%", "10%", "10%", "10%")
-  df <- data.frame(groups, tot_deaths, vax)
-  
-  ggplot(df, aes(fill = vax_avaliable, x=groups, y=tot_deaths)) + 
-    geom_bar(position = "dodge", stat = "identity") + 
-    xlab("Strategy") + 
-    ylab("Total deaths (%)")
-}
-
 # Plot over vaccine avaliablity ----
 plot_over_vax_avail = function(outcome, var_name, list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var){
  
   theme_set(theme_minimal(base_size = 26))
-  #theme_set(theme_bw(base_size = 26))
   
   percent_kids <- round(sum(age_demo[1:2])*100)
   percent_elderly <- round(sum(age_demo[7:9])*100)
   percent_adults <- round(sum(age_demo[3:5])*100)
   percent_twentyplus <- round(sum(age_demo[3:9])*100)
   
+  # get dataframe for specific outcome
   if (outcome == "cases"){
     df <- get_reduction_in_cases_df(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var)
     } 
@@ -917,14 +676,16 @@ plot_over_vax_avail = function(outcome, var_name, list_all_var, list_kids_var, l
   else if (outcome == "YLL"){
     df <- get_reduction_in_YLL_df(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var)
   }
-
+  
+  # lines stop when age groups are completely vaccinated
   if (percent_kids < 50){df[df$strat == "kids" & df$vax_avail > percent_kids, ]$reduction = NA}
   if (percent_elderly < 50) {df[df$strat == "elderly" & df$vax_avail > percent_elderly, ]$reduction = NA}
   if (percent_adults < 50) {df[df$strat == "adults" & df$vax_avail > percent_adults, ]$reduction = NA}
   if (percent_twentyplus < 50) {df[df$strat == "twentyplus" & df$vax_avail > percent_twentyplus, ]$reduction = NA}
   
+  # plot
   p <- ggplot(df, aes(x = vax_avail, y = reduction, col = strat, fill = strat)) +
-    geom_line(size = 2, alpha = 1) + #aes(linetype = variable)
+    geom_line(size = 2, alpha = 1, aes(linetype = variable)) +
     xlab("Total vaccine supply (% of pop)") +
     scale_color_brewer(palette = "Dark2", name = "Allocation Strategy",
                        labels =  c("Adults 20-49", "All Ages", "Adults 60+", 
@@ -933,7 +694,6 @@ plot_over_vax_avail = function(outcome, var_name, list_all_var, list_kids_var, l
                             labels = c("Constant", "Age-dependent")) +
     scale_y_continuous(expand = c(0,0), limit = c(0, 100.2)) +
     scale_x_continuous(expand = c(0,0), limit = c(0, 50)) +#, breaks = c(0,25,50)) +
-    # geom_abline(slope = 1, intercept = 0, size = 3, alpha = 0.2) +
     ggtitle(paste0(country)) +
     theme(legend.position = "none",
           #       axis.title.x =element_blank(),
@@ -1091,9 +851,9 @@ plot_over_vax_avail_varyingprev = function(list_df, outcome){
   } else {
     p <- p + theme(axis.title.x = element_blank(),         
                    axis.title.y = element_blank(), 
-                   axis.text.x = element_blank(), 
+                   axis.text.x = element_text(size = 17), 
                    axis.text.y = element_text(size = 17),
-                   plot.title = element_text(size = 17),
+                   plot.title = element_blank(),
                    legend.position = "none") 
   }
 
@@ -1103,42 +863,14 @@ plot_over_vax_avail_varyingprev = function(list_df, outcome){
                        size = 1.1, alpha = 0.25)
   }
   
-  if (outcome == "cases") {
-    df_Herzog <- get_reduction_in_cases_df(list_all_sero_notest, list_kids_sero_notest, list_adults_sero_notest, list_elderly_sero_notest, list_twentyplus_sero_notest)
-    colnames(df_Herzog)[3] <- "reduction"
-  } else {
-    df_Herzog <- get_reduction_in_deaths_df(list_all_sero_notest, list_kids_sero_notest, list_adults_sero_notest, list_elderly_sero_notest, list_twentyplus_sero_notest)
-    colnames(df_Herzog)[4] <- "reduction"}
-  
-  if (percent_kids < 50){df_Herzog[df_Herzog$strat == "kids" & df_Herzog$vax_avail > percent_kids, ]$reduction = NA}
-  if (percent_elderly < 50) {df_Herzog[df_Herzog$strat == "elderly" & df_Herzog$vax_avail > percent_elderly, ]$reduction = NA}
-  if (percent_adults < 50) {df_Herzog[df_Herzog$strat == "adults" & df_Herzog$vax_avail > percent_adults, ]$reduction = NA}
-  if (percent_twentyplus < 50) {df_Herzog[df_Herzog$strat == "twentyplus" & df_Herzog$vax_avail > percent_twentyplus, ]$reduction = NA}
-  
-  # 
-  # p <- p + geom_line(data = df_Herzog[df_Herzog$variable == "var",],
-  #                    aes(x = vax_avail, y = reduction, col = strat),
-  #                    size = 1.1, alpha = 1)
   return(p)
 } 
 
-plot_serotesting_over_vax_avail = function(outcome, strat_to_plot, mycol){
-  # plots comparison of testing v no testing
-  if (strat_to_plot == "all"){plot_title <- "All Ages"
-                              this_color = col_all
-  } else if (strat_to_plot == "kids"){plot_title <- "Children (0-19)"
-                                      this_color = col_kids
-  } else if (strat_to_plot == "young adults"){plot_title <- "Young Adults (20-49)"
-                                              this_color = col_youngadults
-  } else if (strat_to_plot == "elderly"){plot_title <- "Elderly (60+)"
-                                          this_color = col_elderly
-  } else if (strat_to_plot == "adults"){plot_title <- "Adults (20+)"
-                                        this_color = col_adults
-  }
-  
+plot_serotesting_over_vax_avail = function(outcome){
   total_cases <- rep(NA, 510)
   total_deaths <- rep(NA, 510)
   count <- 1
+  
   for (i in list_all_sero_notest){
     total_cases[count] <- compute_total_cases(i)
     total_deaths[count] <- compute_total_deaths(i)
@@ -1213,16 +945,25 @@ plot_serotesting_over_vax_avail = function(outcome, strat_to_plot, mycol){
     temp <- c(rep(baseline_cases_notest, num_per_list), rep(baseline_cases_test, num_per_list))
     baseline_cases <- c(rep(temp, num_strategies))
     
-    reduction_in_cases <- (1-(total_cases/baseline_cases))*100
-    
-    df <- data.frame(vax_avail, strat, reduction_in_cases, variable)
+    reduction <- (1-(total_cases/baseline_cases))*100
+  }
+  else if (outcome == "deaths"){
+      baseline_deaths_notest <- compute_total_deaths(list_all_sero_notest$`0`)
+      baseline_deaths_test <- compute_total_deaths(list_all_sero_test$`0`)
+
+      temp <- c(rep(baseline_deaths_notest, num_per_list), rep(baseline_deaths_test, num_per_list))
+      baseline_deaths <- c(rep(temp, num_strategies))
+
+      reduction <- (1-(total_deaths/baseline_deaths))*100
+  }
+    df <- data.frame(vax_avail, strat, reduction, variable)
     # for Belgium sero
-    df[df$strat == "kids" & vax_avail > 23 & variable == "notest", ]$reduction_in_cases = NA
-    df[df$strat == "kids" & vax_avail > 22 & variable == "test", ]$reduction_in_cases = NA
-    df[df$strat == "elderly" & vax_avail > 26 & variable == "notest", ]$reduction_in_cases = NA
-    df[df$strat == "elderly" & vax_avail > 25 & variable == "test", ]$reduction_in_cases = NA
-    df[df$strat == "adults" & vax_avail > 38 & variable == "notest", ]$reduction_in_cases = NA
-    df[df$strat == "adults" & vax_avail > 36 & variable == "test", ]$reduction_in_cases = NA
+    df[df$strat == "kids" & vax_avail > 23 & variable == "notest", ]$reduction = NA
+    df[df$strat == "kids" & vax_avail > 22 & variable == "test", ]$reduction = NA
+    df[df$strat == "elderly" & vax_avail > 26 & variable == "notest", ]$reduction = NA
+    df[df$strat == "elderly" & vax_avail > 25 & variable == "test", ]$reduction = NA
+    df[df$strat == "adults" & vax_avail > 38 & variable == "notest", ]$reduction = NA
+    df[df$strat == "adults" & vax_avail > 36 & variable == "test", ]$reduction = NA
     
     # ## for NY sero
     # df[df$strat == "kids" & vax_avail > percent_kids & variable == "notest", ]$reduction_in_cases = NA
@@ -1233,9 +974,7 @@ plot_serotesting_over_vax_avail = function(outcome, strat_to_plot, mycol){
     # df[df$strat == "adults" & vax_avail > 30 & variable == "test", ]$reduction_in_cases = NA
     # df[df$strat == "all" & vax_avail > 37 & variable == "test", ]$reduction_in_cases = NA
     
-    #df <- df[df$strat == strat_to_plot, ]
-    
-    ggplot(df, aes(x = vax_avail, y = reduction_in_cases, col = strat)) +
+    ggplot(df, aes(x = vax_avail, y = reduction, col = strat)) +
       geom_line(aes(linetype = variable), size = 1.2, alpha = 0.9) +
       xlab("Total vaccine supply (% of pop)") +
       ylab("Reduction in infections (%)") +
@@ -1244,10 +983,11 @@ plot_serotesting_over_vax_avail = function(outcome, strat_to_plot, mycol){
       theme(
             #legend.text = element_text(size=22),
             #legend.title = element_text(size=22),
-            legend.position = "none",
-             axis.title.x = element_blank(),
+             legend.position = "none",
+             #axis.title.x = element_blank(),
              axis.text.y  = element_blank(),
              axis.text.x = element_text(size = 17),
+             #axis.text.x = element_blank(),
              axis.title.y = element_blank(),
              plot.title = element_blank()) +
       scale_y_continuous(expand = c(0,0), limit = c(0, 100)) +
@@ -1256,56 +996,6 @@ plot_serotesting_over_vax_avail = function(outcome, strat_to_plot, mycol){
                          labels =  c("Adults 20-49", "All Ages", "Adults 60+", 
                                      "Under 20", "Adults 20+", "Optimal")) +
       guides(colour = guide_legend(override.aes = list(size=6)))
-  } 
-  else if (outcome == "deaths"){
-    baseline_deaths_notest <- compute_total_deaths(list_all_sero_notest$`0`)
-    baseline_deaths_test <- compute_total_deaths(list_all_sero_test$`0`)
-    
-    temp <- c(rep(baseline_deaths_notest, num_per_list), rep(baseline_deaths_test, num_per_list))
-    baseline_deaths <- c(rep(temp, num_strategies))
-    
-    reduction_in_deaths <- (1-(total_deaths/baseline_deaths))*100
-    
-    df <- data.frame(vax_avail, strat, reduction_in_deaths, variable)
-    
-    # for Belgium sero
-    df[df$strat == "kids" & vax_avail > 23 & variable == "notest", ]$reduction_in_deaths = NA
-    df[df$strat == "kids" & vax_avail > 22 & variable == "test", ]$reduction_in_deaths = NA
-    df[df$strat == "elderly" & vax_avail > 26 & variable == "notest", ]$reduction_in_deaths = NA
-    df[df$strat == "elderly" & vax_avail > 25 & variable == "test", ]$reduction_in_deaths = NA
-    df[df$strat == "adults" & vax_avail > 38 & variable == "notest", ]$reduction_in_deaths = NA
-    df[df$strat == "adults" & vax_avail > 36 & variable == "test", ]$reduction_in_deaths = NA
-    
-    # ## for NY sero
-    # df[df$strat == "kids" & vax_avail > percent_kids & variable == "notest", ]$reduction_in_deaths = NA
-    # df[df$strat == "kids" & vax_avail > 18 & variable == "test", ]$reduction_in_deaths = NA
-    # df[df$strat == "elderly" & vax_avail > percent_elderly & variable == "notest", ]$reduction_in_deaths = NA
-    # df[df$strat == "elderly" & vax_avail > 18 & variable == "test", ]$reduction_in_deaths = NA
-    # df[df$strat == "adults" & vax_avail > percent_adults & variable == "notest", ]$reduction_in_deaths = NA
-    # df[df$strat == "adults" & vax_avail > 30 & variable == "test", ]$reduction_in_deaths = NA
-    # df[df$strat == "all" & vax_avail > 37 & variable == "test", ]$reduction_in_deaths = NA
-    #df <- df[df$strat == strat_to_plot, ]
-    
-    ggplot(df, aes(x = vax_avail, y = reduction_in_deaths, col = strat)) +
-      geom_line(aes(linetype = variable), size = 1.2, alpha = 0.9) +
-      xlab("Total vaccine supply (% of pop)") +
-      ylab("Reduction in deaths (%)") +
-      scale_linetype_discrete(name = "Scenario",
-                              labels = c("W/o sero tests", "W/ sero tests")) +
-      scale_y_continuous(expand = c(0,0), limit = c(0, 100)) +
-      scale_x_continuous(expand = c(0,0), limit = c(0, 50), breaks = c(0,10, 20, 30, 40, 50)) +
-      theme(legend.position = "none", 
-             axis.title.x = element_blank(),
-             axis.text.x  = element_blank(),
-             axis.text.y  = element_blank(),
-             axis.title.y = element_blank(),
-            plot.title = element_text(color = this_color, size = 17)) +
-      scale_color_brewer(palette = "Dark2", name = "Allocation Strategy",
-                         labels =  c("Young Adults (20-49)", "All Ages", "Elderly (60+)", 
-                                     "Children (0-19)", "Adults (20+)", "Optimal")) +
-      guides(colour = guide_legend(override.aes = list(size=6))) 
-      #ggtitle(plot_title)
-  }
 }
 
 # Other plotting fn ----
@@ -1315,3 +1005,168 @@ get_legend = function(myggplot){
   legend <- tmp$grobs[[leg]]
   return(legend)
 }
+
+# OLD PLOTTING CODE FN - needs to be updated
+# barplot_at_finalT = function(solution_df, IFR, strategy, y, nvax = 0){
+#   if (strategy == "no vax"){
+#     vaccinated <- rep(0,num_groups) * 100
+#     this_color <- "#808080"
+#     plot_title <- "No Vaccines"
+#   } 
+#   else {
+#     if (strategy == "all"){
+#       groups <- 1:9
+#       this_color <- col_all
+#       plot_title <- "All Ages"
+#       sub_title <- ""
+#     } 
+#     else if (strategy == "kids"){
+#       groups <- 1:2
+#       this_color <- col_kids
+#       plot_title <- "Children (0-19)"
+#       sub_title <- ""
+#     } 
+#     else if (strategy == "adults"){
+#       groups <- 3:5
+#       this_color <- col_youngadults
+#       plot_title <- "Young Adults (20-49)"
+#       sub_title <- "(20-49)"
+#     } 
+#     else if (strategy == "elderly"){
+#       groups <- 7:9
+#       this_color <- col_elderly
+#       plot_title <- "Elderly (60+)"
+#       sub_title <- "(60+)"
+#     }
+#     else if (strategy == "20+"){
+#       groups <- 3:9
+#       this_color <- col_adults
+#       plot_title <- "Adults (20+)"
+#       sub_title <- "(20+)"
+#     }
+#     people_to_vax <- sum(N_i[groups])
+#     
+#     vax_proportion <- rep(0, num_groups)
+#     vax_proportion[groups] <- N_i[groups]/people_to_vax
+#     
+#     vax_distribution <- nvax*vax_proportion
+#     vax_distribution[vax_distribution > N_i] <- N_i[vax_distribution > N_i]
+#     vaccinated <- vax_distribution/N_i * 100
+#   }
+#   
+#   infections <- rep(0,num_groups)
+#   deaths <- rep(0, num_groups)
+#   final_S <- rep(0, num_groups)
+#   
+#   R_index <- 29 # col number for R1
+#   
+#   for (i in 1:num_groups) {
+#     deaths[i] <- max(solution_df[R_index])*IFR[i]/N_i[i]*100
+#     infections[i] <- max(solution_df[R_index]) # total infected (including dead)
+#     # infections[i] <- max(solution_df[R_index])*(1-IFR[i])/N_i[i] # total infected (excluding dead)
+#     final_S[i] <- solution_df[(max(t) + 1), (i + 1)]/N_i[i]
+#     R_index <- R_index + 1
+#   }
+#   
+#   #age_groups <- c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")
+#   age_groups <- c("0","10", "20", "30", "40", "50", "60", "70", "80")
+#   
+#   df <- data.frame(age_groups, final_S, deaths, infections, vaccinated)
+#   
+#   new_df <- df %>%
+#     # select(age_groups, infections, deaths, vaccinated, final_S) %>%
+#     select(age_groups, all_of(y)) %>%
+#     gather(key = "type", value = "num", -age_groups)
+#   
+#   theme_set(theme_classic(base_size = 20))
+#   
+#   # plot
+#   p <- ggplot(new_df, aes(fill=type, y=num, x=age_groups)) + 
+#     geom_bar(position="stack", stat="identity", fill = this_color) + 
+#     xlab("Age group") +
+#     scale_x_discrete(breaks=c("0","10", "20", "30", "40", "50", "60","70", "80"), 
+#                      labels=c("0","", "20", "", "40", "", "60","", "80")) + 
+#     scale_y_continuous(expand = c(0,0), limit = c(0, 100), breaks = c(0, 50, 100)) +
+#     theme(plot.subtitle = element_text(size = 9, face = "italic", hjust = 1),
+#           plot.title = element_text(size = 17),
+#           axis.title.x =element_blank(), 
+#           axis.title.y = element_blank())
+#   
+#   if (y == "infections") {
+#     string_to_add <- paste0("Total infected: ", round(compute_total_cases(solution_df),2), "%")
+#     
+#     p <- p + 
+#       #ylim(0, 100) + 
+#       ylab("Infected (%)") + 
+#       # labs(title = plot_title, subtitle = string_to_add)
+#       labs(subtitle = string_to_add)
+#   } 
+#   else if (y == "deaths") {
+#     string_to_add <- paste0("Total deaths: ", round(compute_total_deaths(solution_df),2), "%")
+#     
+#     p <- p + 
+#       ylim(0, 8) + 
+#       ylab("Deaths (%)") + 
+#       # labs(title = plot_title, subtitle = string_to_add)
+#       labs(subtitle = string_to_add)
+#   } 
+#   else if (y == "vaccinated"){
+#     p <- p + 
+#       #ylim(0, 100) + 
+#       ylab("Vaccinated (%)") 
+#     #labs(title = plot_title)
+#   }
+#   p # output ggplot
+# }
+# plot_totalinfections_sero =function(df_baseline, df_sero_notest, df_sero_test, compartment){
+#   # INPUTS:
+#   # df: simulation to plot
+#   # compartment: character of compartment to plot i.e. "I", "R"
+#   #
+#   # OUTPUT:
+#   # p: ggplot object of plot
+#   
+#   # make new df for plotting
+#   if (compartment == "I"){
+#     total <- data.frame(time = 0:150,
+#                         baseline = apply(df_baseline[20:28], 1, sum), 
+#                         sero_notest = apply(df_sero_notest[20:28], 1, sum),
+#                         sero_test = apply(df_sero_test[20:28], 1, sum))
+#   } else if (compartment == "R"){
+#     total <- data.frame(time = 0:150,
+#                         baseline = apply(df_baseline[29:37], 1, sum), 
+#                         sero_notest = apply(df_sero_notest[29:37], 1, sum),
+#                         sero_test = apply(df_sero_test[29:37], 1, sum))
+#   }
+#   
+#   new_df <- total %>%
+#     select(time, baseline, sero_notest, sero_test) %>%
+#     gather(key = "scenario", value = "num", -time)
+#   
+#   # Add col for percent infected & recovered
+#   new_df$percent <- new_df$num/pop_total*100
+#   
+#   # Plot
+#   theme_set(theme_minimal(base_size = 20))
+#   
+#   # string_to_add <- paste0("Total infected: ", compute_total_cases(df), "%")
+#   
+#   # Create a text
+#   # grob <- grobTree(textGrob(string_to_add, x=0.5,  y=0.95, hjust=0,
+#   #                           gp=gpar(col="white", fontsize=13, fontface="bold")))
+#   
+#   # Plot
+#   p <- ggplot(new_df, aes(x = time, y = percent)) + 
+#     geom_line(aes(color = scenario), size = 2.5) +
+#     xlab("Time") +
+#     guides(colour = guide_legend(override.aes = list(size=6))) +
+#   #   annotation_custom(grob) +
+#     scale_color_manual(values = wes_palette("GrandBudapest1", n = 3), name = "Scenario", 
+#                         labels =  c("Baseline\n(no seropositive)\n", "Seropositive\nno testing\n", "Seropositive\nwith testing"))
+#   # 
+#   if (compartment == "I") {
+#     p <- p + ylab("Percent Infected") + ylim(0, 16)
+#   } else if (compartment == "R") {
+#     p <- p + ylab("Percent Recovered") + ylim(0,1)
+#   }
+# }
