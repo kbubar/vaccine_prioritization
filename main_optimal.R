@@ -54,7 +54,17 @@ get_initial_vax <- function(nvax){
 # _____________________________________________________________________
 # SET UP ----
 # _____________________________________________________________________
-# Demographics
+# # country codes:
+# Belgium: BEL
+# United States: USA
+# India: IND
+# Spain: ESP
+# Zimbabwe: ZWE
+# Brazil: BRA
+# China: CHN
+# South Africa: ZAF
+# Poland: POL
+
 country <- "BEL"
 
 C <- readRDS(paste0("C_", country, "_bytens_overall.RData"))
