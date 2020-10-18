@@ -2,7 +2,7 @@
 
 Code layout: 
 
-main.R - script to run the model for evaluating the 5 different strategies and plot figures (includes a lot of code for old figures)
+main.R - script to run the model for evaluating the 5 different strategies and plot figures (includes a lot of code for old figures), enter the country of interest using the three letter country code
 
 main_optimal.R - script to run the optimization code for the model and plot some of the related optimal-related figures
 
