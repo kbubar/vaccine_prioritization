@@ -4,6 +4,8 @@ Code layout:
 
 main.R - script to run the model for evaluating the 5 different strategies and plot figures (includes a lot of code for old figures), enter the country of interest using the three letter country code
 
+main_heatmap.R - script to run the model and produce heatmap plots to visualize the best strategy under specified parameter values
+
 helper_functions.R - most of the functions for main.R, model related functions at the top, plotting functions at the bottom
                    
 run_sim.R - model function
