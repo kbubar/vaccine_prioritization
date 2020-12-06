@@ -1,4 +1,10 @@
 # Combine 5 year age-group contact matrix from Prem for 10 years age-groups 
+library(grid)
+library(readxl)
+
+setwd("~/Vaccine Strategy/Vaccine_Allocation_Project")
+age_df <- read_excel("WPP2019_POP_F07_1_POPULATION_BY_AGE_BOTH_SEXES.xlsx", "ESTIMATES")
+
 
 # setwd to file with Prem contact matrices
 setwd("~/Vaccine Strategy/Vaccine_Allocation_Project/Prem_contact_matrices")
@@ -23,6 +29,29 @@ convert_bins_5to10 <- function(C_byfives) {
         C_byfives[row, col + 1] +
         C_byfives[row + 1, col] +
         C_byfives[row + 1, col + 1]
+      row_count <- row_count + 1
+    }
+    col_count <- col_count + 1
+  }
+  
+  colnames(C_bytens) <- c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79")
+  rownames(C_bytens) <- colnames(C_bytens)
+  
+  C_bytens
+}
+
+convert_bins_5to10_updated <- function(C_byfives) {
+  l <- dim(C_byfives)[1]
+  C_bytens <- matrix(nrow = l/2, ncol = l/2)
+  
+  col_count <- 1
+  for (col in seq(1,l,by = 2)){
+    row_count <- 1
+    for (row in seq(1,l, by = 2)){
+      p1 <- pop_demo[row]
+      p2 <- pop_demo[row + 1]
+      C_bytens[row_count, col_count] <- ((C_byfives[row, col] + C_byfives[row, col + 1])*p1 +
+        (C_byfives[row + 1, col] + C_byfives[row + 1, col + 1])*p2)/(p1+p2)
       row_count <- row_count + 1
     }
     col_count <- col_count + 1
@@ -95,18 +124,35 @@ add_80bin <- function(C_bytens){
 # South Africa: ZAF
 # Poland: POL
 
-country <- "ZWE"
+countrycode <- "USA"
+country <- "United States of America"
+
+
+# age demographics by 5 year age bin (to weight C when aggregating)
+popdata <- age_df[age_df$Country == country,]
+popdata <- popdata[popdata$Year == 2020,]
+pop_demo <- rep(0, 18)
+col_num <- 9 # col of 0-4 y.o.
+
+for (i in 0:16){
+  pop_demo[i+1] <- as.numeric(popdata[col_num+i])
+}
+
+pop_demo[18] <- sum(as.numeric(popdata[(col_num+i+1):29]))
+total_pop <- sum(pop_demo)
+pop_demo <- pop_demo/total_pop
+
 setting <- "overall" #overall, rural or urban
 #* C for all locations (home, work, school & other) ----
 df <- read.csv("synthetic_contacts_2020.csv")
 
-df <- df[df$iso3c == country,]
+df <- df[df$iso3c == countrycode,]
 df <- df[df$location_contact == "all",]
 df <- df[df$setting == setting,]
 
 nage <- 16 # number of age groups
 
-# construct C(i,j) = # of age j people that an age i person contacts each day
+# construct C(i,j) = of age j people that an age i person contacts each day
 C <- matrix(ncol = nage, nrow = nage)
 
 contactor <- c("0 to 4" , "5 to 9", "10 to 14" ,"15 to 19", "20 to 24", "25 to 29", 
@@ -130,7 +176,7 @@ heatmap(C, NA, NA, scale = "column", xlab = "Age of Individual", ylab = "Age of 
         labCol = c(NA, 10, NA, 20, NA, 30, NA, 40, NA, 50, NA, 60,  NA, 70, NA, 80))
 
 
-C_bytens <- convert_bins_5to10(C)
+C_bytens <- convert_bins_5to10_updated(C)
 heatmap(C_bytens, NA, NA, scale = "column", xlab = "Age of Individual", ylab = "Age of Contact")
 
 C_bytens <- add_80bin(C_bytens)
@@ -140,5 +186,5 @@ heatmap(C_bytens, NA, NA, scale = "none",
         cexRow = 1.5, 
         cexCol = 1.5)
 
-saveRDS(C_bytens, paste0("C_", country,"_bytens_", setting, ".RData"))
+saveRDS(C_bytens, paste0("C_", countrycode,"_bytens_", setting, "updated.RData"))
 
