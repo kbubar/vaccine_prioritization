@@ -4,7 +4,8 @@
 # https://www.medrxiv.org/content/10.1101/2020.07.23.20160895v4.full.pdf+html
 
 age = seq(0,89,1)
-IFR_byones = exp(-7.56 + 0.121*age)
+# IFR_byones = exp(-7.56 + 0.121*age) # old version
+IFR_byones = 10^(-3.27+0.0524*age) # updated version
 IFR_bytens = rep(0, 9)
 
 count = 1  

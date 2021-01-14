@@ -25,17 +25,18 @@ age_demo <- age_demo[1:9]
 N_i <-  pop_total*age_demo      
 num_groups <- length(age_demo) # num age groups
 
-u_var      <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)/39.80957
+u_var      <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)
+scale_15 <- scale_u_for_R0(u_var, C, 1.5)
 v_e_constant <- get_v_e(p = 1, y0 = 1, hinge_age = 50)
-sero_none <- rep(0, 9) # no prior immunity
+sero_none <- rep(0, 9)
 
 # _____________________________________________________________________
 # RUN SIM ----
 # _____________________________________________________________________
+this_C <- C/scale_15
+dat <- run_sim_new(this_C, percent_vax = 0, strategy = "all", num_perday = 0.01, v_e_type = "aorn")
 
-dat <- run_sim_new(C, percent_vax = 0, strategy = "all", num_perday = 0.01, v_e_type = "aorn")
-
-R <- dat[,83:91]
+R <- dat[,83:91] + dat[,101:109]
 R_tot <- rowSums(R)
 
 R_tot <- floor((R_tot/pop_total)*100)

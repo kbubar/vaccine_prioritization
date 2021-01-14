@@ -110,7 +110,8 @@ move_vaccinated = function(x, num_perday, vax_supply, vax_proportion, groups, v_
   alpha[alpha == Inf] <- 0 # no people in S,E,R
   alpha[is.nan(alpha)] <- 0 # no vax left and no people in S,E,R
   #print(paste0("t: ", t, " max alpha:", max(alpha))) ### FIXME
-  if(any(alpha > 1)){print("ERROR: alpha > 1 in move_vaccinated")}
+  if(any(alpha > 1)){print("WARNING: alpha > 1 in move_vaccinated")
+    alpha[alpha>1] <- 0}
   
   if (v_e_type == "leaky") {
     dS  <- -as.matrix(S*alpha*sp) - as.matrix(S*alpha*(1-sp))
@@ -152,17 +153,21 @@ move_vaccinated = function(x, num_perday, vax_supply, vax_proportion, groups, v_
 
 move_vaccinated_NTB = function(x, num_perday, vax_supply, vax_proportion, groups) {
   # move those who are vaccinated in a given day
-  num_compartment <- 9
+  num_compartment <- 13
   num_groups <- length(x)/num_compartment
   S    <- as.matrix(x[1:num_groups])
   Sv   <- as.matrix(x[(1*num_groups+1):(2*num_groups)])
-  E    <- as.matrix(x[(2*num_groups+1):(3*num_groups)])
-  Ev   <- as.matrix(x[(3*num_groups+1):(4*num_groups)])
-  I    <- as.matrix(x[(4*num_groups+1):(5*num_groups)])
-  Iv   <- as.matrix(x[(5*num_groups+1):(6*num_groups)])
-  R    <- as.matrix(x[(6*num_groups+1):(7*num_groups)])
-  Rv   <- as.matrix(x[(7*num_groups+1):(8*num_groups)])
-  D    <- as.matrix(x[(8*num_groups+1):(9*num_groups)])
+  Sx   <- as.matrix(x[(2*num_groups+1):(3*num_groups)])
+  E    <- as.matrix(x[(3*num_groups+1):(4*num_groups)])
+  Ev   <- as.matrix(x[(4*num_groups+1):(5*num_groups)])
+  Ex   <- as.matrix(x[(5*num_groups+1):(6*num_groups)])
+  I    <- as.matrix(x[(6*num_groups+1):(7*num_groups)])
+  Iv   <- as.matrix(x[(7*num_groups+1):(8*num_groups)])
+  Ix   <- as.matrix(x[(8*num_groups+1):(9*num_groups)])
+  R    <- as.matrix(x[(9*num_groups+1):(10*num_groups)])
+  Rv   <- as.matrix(x[(10*num_groups+1):(11*num_groups)])
+  Rx   <- as.matrix(x[(11*num_groups+1):(12*num_groups)])
+  D    <- as.matrix(x[(12*num_groups+1):(13*num_groups)])
   
   if (vax_supply >= num_perday*pop_total){
     nvax <- num_perday*pop_total
@@ -217,7 +222,8 @@ move_vaccinated_NTB = function(x, num_perday, vax_supply, vax_proportion, groups
   alpha[alpha == Inf] <- 0 # no people in S,E,R
   alpha[is.nan(alpha)] <- 0 # no vax left and no people in S,E,R
   #print(paste0("t: ", t, " max alpha:", max(alpha))) ### FIXME
-  if(any(alpha > 1)){print("ERROR: alpha > 1 in move_vaccinated")}
+  if(any(alpha > 1)){print("WARNING: alpha > 1 in move_vaccinated")
+    alpha[alpha>1] <- 0}
 
   dS  <- -as.matrix(S*alpha)
   dSv <- as.matrix(S*alpha)
@@ -237,7 +243,7 @@ move_vaccinated_NTB = function(x, num_perday, vax_supply, vax_proportion, groups
   Rv   <- Rv + dRv
   
   # output updated compartments
-  out <- c(S,Sv,E,Ev,I,Iv,R,Rv,D)
+  out <- c(S,Sv,Sx,E,Ev,Ex,I,Iv,Ix,R,Rv,Rx,D)
 }
 
 calculate_derivatives_new=function(t, x, parameters){
@@ -273,10 +279,6 @@ calculate_derivatives_new=function(t, x, parameters){
   Rx[Rx < .Machine$double.eps] <- 0
   D[D < .Machine$double.eps] <- 0
   
-  # I[I<0] = 0
-  # Iv[Iv<0] = 0
-  # Ix[Ix<0] = 0
-  
   u <- parameters$u
   C <- parameters$C
   d_E <- parameters$d_E
@@ -284,33 +286,33 @@ calculate_derivatives_new=function(t, x, parameters){
   v_e <- parameters$v_e
   v_e_type <- parameters$v_e_type
   
-  lambda <- as.matrix((C)%*%as.matrix((I+Iv+Ix)/N_i) * as.matrix(u) )
+  lambda <- C%*%((I+Iv+Ix)/(N_i-D))*u
   
   if (v_e_type == "leaky") {
-    dSv <- -as.matrix(Sv*(1-v_e)*lambda)
-    dEv <- as.matrix(Sv*(1-v_e)*lambda) - d_E*as.matrix(Ev) 
+    dSv <- -(Sv*(1-v_e)*lambda)
+    dEv <- (Sv*(1-v_e)*lambda) - d_E*Ev 
   } else {
     # all-or-nothing
     dSv <- rep(0, num_groups)
     dEv <- -d_E*as.matrix(Ev)
   }
-  
-  dS  <- -as.matrix(S*lambda)
-  dSx <- -as.matrix(Sx*lambda)
-  
-  dE  <- as.matrix(S*lambda) - d_E*as.matrix(E)
-  dEx <- as.matrix(Sx*lambda) - d_E*as.matrix(Ex)
-  
-  dI  <- as.matrix(E*d_E) - as.matrix(I*d_I)
-  dIv <- as.matrix(Ev*d_E) - as.matrix(Iv*d_I)
-  dIx <- as.matrix(Ex*d_E) - as.matrix(Ix*d_I)
-  
-  dR  <- as.matrix(I*d_I*(1-IFR)) 
-  dRv <- as.matrix(Iv*d_I*(1-IFR)) 
-  dRx <- as.matrix(Ix*d_I*(1-IFR)) 
-  
-  dD  <- as.matrix(I*d_I*IFR + Iv*d_I*IFR + Ix*d_I*IFR)
     
+  dS  <- -(S*lambda)
+  dSx <- -(Sx*lambda)
+
+  dE  <- S*lambda - d_E*E
+  dEx <- Sx*lambda - d_E*Ex
+
+  dI  <- E*d_E - I*d_I
+  dIv <- Ev*d_E - Iv*d_I
+  dIx <- Ex*d_E - Ix*d_I
+
+  dR  <- I*d_I*(1-IFR)
+  dRv <- Iv*d_I*(1-IFR)
+  dRx <- Ix*d_I*(1-IFR)
+
+  dD  <- I*d_I*IFR + Iv*d_I*IFR + Ix*d_I*IFR
+  
   out <- c(dS,dSv,dSx,dE,dEv,dEx,dI,dIv,dIx,dR,dRv,dRx,dD)
   list(out)
 }
@@ -318,26 +320,34 @@ calculate_derivatives_new=function(t, x, parameters){
 calculate_derivatives_NTB = function(t, x, parameters){
   # x is a vector of length (# model compartment types)*(# age groups)
   # S, E, I, R etc. are vectors of length num_groups
-  num_compartment <- 9
+  num_compartment <- 13
   num_groups <- length(x)/num_compartment
   S    <- as.matrix(x[1:num_groups])
   Sv   <- as.matrix(x[(1*num_groups+1):(2*num_groups)])
-  E    <- as.matrix(x[(2*num_groups+1):(3*num_groups)])
-  Ev   <- as.matrix(x[(3*num_groups+1):(4*num_groups)])
-  I    <- as.matrix(x[(4*num_groups+1):(5*num_groups)])
-  Iv   <- as.matrix(x[(5*num_groups+1):(6*num_groups)])
-  R    <- as.matrix(x[(6*num_groups+1):(7*num_groups)])
-  Rv   <- as.matrix(x[(7*num_groups+1):(8*num_groups)])
-  D    <- as.matrix(x[(8*num_groups+1):(9*num_groups)])
+  Sx   <- as.matrix(x[(2*num_groups+1):(3*num_groups)])
+  E    <- as.matrix(x[(3*num_groups+1):(4*num_groups)])
+  Ev   <- as.matrix(x[(4*num_groups+1):(5*num_groups)])
+  Ex   <- as.matrix(x[(5*num_groups+1):(6*num_groups)])
+  I    <- as.matrix(x[(6*num_groups+1):(7*num_groups)])
+  Iv   <- as.matrix(x[(7*num_groups+1):(8*num_groups)])
+  Ix   <- as.matrix(x[(8*num_groups+1):(9*num_groups)])
+  R    <- as.matrix(x[(9*num_groups+1):(10*num_groups)])
+  Rv   <- as.matrix(x[(10*num_groups+1):(11*num_groups)])
+  Rx   <- as.matrix(x[(11*num_groups+1):(12*num_groups)])
+  D    <- as.matrix(x[(12*num_groups+1):(13*num_groups)])
   
   S[S < .Machine$double.eps] <- 0
   Sv[Sv < .Machine$double.eps] <- 0
+  Sx[Sx < .Machine$double.eps] <- 0
   E[E < .Machine$double.eps] <- 0
   Ev[Ev < .Machine$double.eps] <- 0
+  Ex[Ex < .Machine$double.eps] <- 0
   I[I < .Machine$double.eps] <- 0
   Iv[Iv < .Machine$double.eps] <- 0
+  Ix[Ix < .Machine$double.eps] <- 0
   R[R < .Machine$double.eps] <- 0
   Rv[Rv < .Machine$double.eps] <- 0
+  Rx[Rx < .Machine$double.eps] <- 0
   D[D < .Machine$double.eps] <- 0
   
   u <- parameters$u
@@ -346,24 +356,29 @@ calculate_derivatives_NTB = function(t, x, parameters){
   ve_I <- parameters$ve_I
   ve_P <- parameters$ve_P
   
-  lambda <- as.matrix(C %*% as.matrix(((I+(1-ve_I)*Iv)/N_i)) * as.matrix(u))
-  lambda_V <- (1-ve_S)*as.matrix(C %*% as.matrix((I+(1-ve_I)*Iv)/N_i) * as.matrix(u))
+  lambda <- C %*% ((I+(1-ve_I)*Iv + Ix)/(N_i-D)) * u
+  lambda_V <- (1-ve_S)*C %*% ((I+(1-ve_I)*Iv + Ix)/(N_i-D)) * u
 
-  dSv <- -as.matrix(Sv*lambda_V)
-  dEv <- as.matrix(Sv*lambda_V) - d_E*as.matrix(Ev) 
+  dSv <- -Sv*lambda_V
+  dEv <- Sv*lambda_V - d_E*Ev
   
-  dS  <- -as.matrix(S*lambda)
-  dE  <- as.matrix(S*lambda) - d_E*as.matrix(E)
+  dS  <- -S*lambda
+  dE  <- S*lambda - d_E*E
   
-  dI  <- as.matrix(E*d_E) - as.matrix(I*d_I)
-  dIv <- as.matrix(Ev*d_E) - as.matrix(Iv*d_I)
+  dSx <- -Sx*lambda
+  dEx <- Sx*lambda - d_E*Ex
   
-  dR  <- as.matrix(I*d_I*(1-IFR)) 
-  dRv <- as.matrix(Iv*d_I*(1 - (1-ve_P)*IFR))
+  dI  <- E*d_E - I*d_I
+  dIv <- Ev*d_E - Iv*d_I
+  dIx <- Ex*d_E - Ix*d_I
   
-  dD  <- as.matrix(I*d_I*IFR + Iv*d_I*(1-ve_P)*IFR)
+  dR  <- I*d_I*(1-IFR) 
+  dRv <- Iv*d_I*(1 - (1-ve_P)*IFR)
+  dRx <- Ix*d_I*(1-IFR)
   
-  out <- c(dS,dSv,dE,dEv,dI,dIv,dR,dRv,dD)
+  dD  <- I*d_I*IFR + Iv*d_I*(1-ve_P)*IFR + Ix*d_I*IFR
+  
+  out <- c(dS,dSv,dSx,dE,dEv,dEx,dI,dIv,dIx,dR,dRv,dRx,dD)
   list(out)
 }
 
@@ -539,59 +554,6 @@ get_best_strat_yll_new = function(supply, all, kids, adults,
   strats[which.max(reduction_in_YLL)]
 }
 
-
-get_best_strat_deaths_NTB = function(supply, all, kids, adults, 
-                                     elderly, twentyplus){
-  # supply is the vaccine supply of interest as an integer
-  
-  total_deaths <- c(compute_total_deaths_NTB(all[[supply + 1]]),
-                    compute_total_deaths_NTB(kids[[supply + 1]]), 
-                    compute_total_deaths_NTB(adults[[supply + 1]]),
-                    compute_total_deaths_NTB(elderly[[supply + 1]]), 
-                    compute_total_deaths_NTB(twentyplus[[supply + 1]]))
-  
-  baseline_deaths <- compute_total_deaths_NTB(all$`0`)
-  reduction_in_deaths <- (1 - (total_deaths/baseline_deaths))*100
-  
-  strats <- c("all", "kids", "adults", "elderly", "twentyplus")
-  strats[which.max(reduction_in_deaths)]
-}
-
-get_best_strat_cases_NTB = function(supply, all, kids, adults, 
-                                    elderly, twentyplus){
-  # supply is the vaccine supply of interest as an integer
-  
-  total_cases <- c(compute_total_cases_NTB(all[[supply + 1]]),
-                   compute_total_cases_NTB(kids[[supply + 1]]), 
-                   compute_total_cases_NTB(adults[[supply + 1]]),
-                   compute_total_cases_NTB(elderly[[supply + 1]]), 
-                   compute_total_cases_NTB(twentyplus[[supply + 1]]))
-  
-  baseline_cases <- compute_total_cases_NTB(all$`0`)
-  reduction_in_cases <- (1 - (total_cases/baseline_cases))*100
-  
-  strats <- c("all", "kids", "adults", "elderly", "twentyplus")
-  strats[which.max(reduction_in_cases)]
-}
-
-get_best_strat_yll_NTB = function(supply, all, kids, adults, 
-                                  elderly, twentyplus){
-  # supply is the vaccine supply of interest as an integer
-  
-  total_YLL <- c(compute_total_YLL_NTB(all[[supply + 1]]),
-                 compute_total_YLL_NTB(kids[[supply + 1]]), 
-                 compute_total_YLL_NTB(adults[[supply + 1]]),
-                 compute_total_YLL_NTB(elderly[[supply + 1]]), 
-                 compute_total_YLL_NTB(twentyplus[[supply + 1]]))
-  
-  baseline_YLL <- compute_total_YLL_NTB(all$`0`)
-  reduction_in_YLL <- (1 - (total_YLL/baseline_YLL))*100
-  
-  strats <- c("all", "kids", "adults", "elderly", "twentyplus")
-  strats[which.max(reduction_in_YLL)]
-}
-
-
 run_v_e_var = function(p, v_e_baseline, hinge_age, vax_amount, num_perday, v_e_type){
   this_v_e <- get_v_e(p, y0 = v_e_baseline, hinge_age = hinge_age) # hinge age is age group that v_e begins decreasing after
   
@@ -600,19 +562,19 @@ run_v_e_var = function(p, v_e_baseline, hinge_age, vax_amount, num_perday, v_e_t
   if (vax_amount > 0){
     for (i in seq(0, vax_amount, by = vax_amount)){
       j <- vax_amount/100
-      all[[paste0(i)]] <- run_sim_new(C, j, "all", num_perday, v_e_type, this_v_e)
-      kids[[paste0(i)]] <- run_sim_new(C, j, "kids", num_perday, v_e_type, this_v_e)
-      adults[[paste0(i)]] <- run_sim_new(C, j, "adults", num_perday, v_e_type, this_v_e)
-      elderly[[paste0(i)]] <- run_sim_new(C, j, "elderly", num_perday, v_e_type, this_v_e)
-      twentyplus[[paste0(i)]] <- run_sim_new(C, j, "twentyplus", num_perday, v_e_type, this_v_e)
+      all[[paste0(i)]] <- run_sim_new(this_C, j, "all", num_perday, v_e_type, this_v_e)
+      kids[[paste0(i)]] <- run_sim_new(this_C, j, "kids", num_perday, v_e_type, this_v_e)
+      adults[[paste0(i)]] <- run_sim_new(this_C, j, "adults", num_perday, v_e_type, this_v_e)
+      elderly[[paste0(i)]] <- run_sim_new(this_C, j, "elderly", num_perday, v_e_type, this_v_e)
+      twentyplus[[paste0(i)]] <- run_sim_new(this_C, j, "twentyplus", num_perday, v_e_type, this_v_e)
     }
   } else{
       i <- 0
-      all[[paste0(i)]] <- run_sim_new(C, vax_amount, "all", num_perday, v_e_type, this_v_e)
-      kids[[paste0(i)]] <- run_sim_new(C, vax_amount, "kids", num_perday, v_e_type, this_v_e)
-      adults[[paste0(i)]] <- run_sim_new(C, vax_amount, "adults", num_perday, v_e_type, this_v_e)
-      elderly[[paste0(i)]] <- run_sim_new(C, vax_amount, "elderly", num_perday, v_e_type, this_v_e)
-      twentyplus[[paste0(i)]] <- run_sim_new(C, vax_amount, "twentyplus", num_perday, v_e_type, this_v_e)
+      all[[paste0(i)]] <- run_sim_new(this_C, vax_amount, "all", num_perday, v_e_type, this_v_e)
+      kids[[paste0(i)]] <- run_sim_new(this_C, vax_amount, "kids", num_perday, v_e_type, this_v_e)
+      adults[[paste0(i)]] <- run_sim_new(this_C, vax_amount, "adults", num_perday, v_e_type, this_v_e)
+      elderly[[paste0(i)]] <- run_sim_new(this_C, vax_amount, "elderly", num_perday, v_e_type, this_v_e)
+      twentyplus[[paste0(i)]] <- run_sim_new(this_C, vax_amount, "twentyplus", num_perday, v_e_type, this_v_e)
       i <- i + 1
       all[[paste0(i)]] <- all[[1]]
       kids[[paste0(i)]] <- kids[[1]]
@@ -649,7 +611,7 @@ v_e_bisection = function(v_e_baseline, hinge_age, vax_amount, num_perday, v_e_ty
       p_low <- p_next
     }
     
-    if ((p_high - p_low) < 0.001){
+    if ((p_high - p_low) < 0.01){
       strat <- run_v_e_var(p_low, v_e_baseline, hinge_age, vax_amount, num_perday, v_e_type)
       out <- list(p_next*100, strat)
       return(out)
@@ -697,7 +659,7 @@ compute_R_with_sero = function(u, C, sero){
 }
 
 scale_u_for_R0 = function(u, C, wanted_R0){
-  scalehigh <- 30
+  scalehigh <- 10
   scalelow <- 100
   
   R0_high <- compute_R0(u/scalehigh, C)
@@ -760,24 +722,6 @@ compute_total_cases_new = function(df){
   tot_infections <- sum(infections)/pop_total * 100
 }
 
-compute_total_cases_NTB = function(df){
-  infections <- rep(0,num_groups) # number of age groups
-  
-  R_index <- 56 # col number for R
-  Rv_index <- 65 # col number for Rv
-  D_index <- 74
-  
-  for (i in 1:num_groups) {
-    # infections = total # recovered - initial recovered (seropositive)
-    infections[i] <- df[dim(df)[1], R_index] - df[1, R_index] +
-      df[dim(df)[1], Rv_index] - df[1, Rv_index] + 
-      df[dim(df)[1], D_index]
-    R_index  <- R_index + 1
-    Rv_index <- Rv_index + 1
-    D_index  <- D_index + 1
-  }
-  tot_infections <- sum(infections)/pop_total * 100
-}
 # compute_total_deaths = function(df){
 #   deaths <- rep(0,num_groups)
 #   
@@ -795,18 +739,6 @@ compute_total_cases_NTB = function(df){
 compute_total_deaths_new = function(df){
   deaths <- rep(0,num_groups)
   D_index <- 110
-  
-  for (i in 1:num_groups) {
-    deaths[i] <- df[dim(df)[1], D_index]
-    D_index <- D_index + 1
-  }
-  
-  tot_deaths <- sum(deaths)/pop_total * 100
-}
-
-compute_total_deaths_NTB = function(df){
-  deaths <- rep(0,num_groups)
-  D_index <- 74
   
   for (i in 1:num_groups) {
     deaths[i] <- df[dim(df)[1], D_index]
@@ -844,83 +776,286 @@ compute_total_YLL_new = function(df){
   tot_YLL <- sum(YLL) # absolute number of YLL
 }
 
-compute_total_YLL_NTB = function(df){
-  YLL <- rep(0,num_groups)
-  
-  D_index <- 74
-  for (i in 1:num_groups) {
-    deaths_temp <- df[dim(df)[1], D_index]
-    YLL[i] <- YLL_vec[i]*deaths_temp
-    D_index <- D_index + 1
+compile_total_cases = function(total){
+  count <- 1
+  for (i in list_all){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  for (i in list_kids){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  for (i in list_adults){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  for (i in list_elderly){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  for (i in list_twentyplus){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
   }
   
-  tot_YLL <- sum(YLL) # absolute number of YLL
+  total
 }
 
-# get_reduction_in_cases_df = function(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var){
-#   total_cases <- rep(NA, 510)
-#   
-#   count <- 1
-#   for (i in list_all){
-#     total_cases[count] <- compute_total_cases(i)
-#     count <- count + 1
-#   }
-#   for (i in list_all_var){
-#     total_cases[count] <- compute_total_cases(i)
-#     count <- count + 1
-#   }
-#   for (i in list_kids){
-#     total_cases[count] <- compute_total_cases(i)
-#     count <- count + 1
-#   }
-#   for (i in list_kids_var){
-#     total_cases[count] <- compute_total_cases(i)
-#     count <- count + 1
-#   }
-#   for (i in list_adults){
-#     total_cases[count] <- compute_total_cases(i)
-#     count <- count + 1
-#   }
-#   for (i in list_adults_var){
-#     total_cases[count] <- compute_total_cases(i)
-#     count <- count + 1
-#   }
-#   for (i in list_elderly){
-#     total_cases[count] <- compute_total_cases(i)
-#     count <- count + 1
-#   }
-#   for (i in list_elderly_var){
-#     total_cases[count] <- compute_total_cases(i)
-#     count <- count + 1
-#   }
-#   for (i in list_twentyplus){
-#     total_cases[count] <- compute_total_cases(i)
-#     count <- count + 1
-#   }
-#   for (i in list_twentyplus_var){
-#     total_cases[count] <- compute_total_cases(i)
-#     count <- count + 1
-#   }
-#   
-#   num_strategies <- 5
-#   vax_avail <- c(rep(seq(0, 50, by = 1), num_strategies*2))
-#   num_per_list <- 51
-#   strat <- c(rep("all", num_per_list*2), rep("kids", num_per_list*2), 
-#              rep("adults", num_per_list*2), rep("elderly", num_per_list*2), 
-#              rep("twentyplus", num_per_list*2))
-#   temp <-  c(rep("constant", num_per_list), rep("var", num_per_list))
-#   variable <- c(rep(temp, num_strategies))
-#   
-#   baseline_cases <- compute_total_cases(list_all$`0`)
-#   baseline_cases_var <- compute_total_cases(list_all_var$`0`)
-#   
-#   temp <- c(rep(baseline_cases, num_per_list), rep(baseline_cases_var, num_per_list))
-#   baseline_cases <- c(rep(temp, num_strategies))
-#   
-#   reduction <- (1-(total_cases/baseline_cases))*100
-#   
-#   df <- data.frame(vax_avail, strat, reduction, variable)
-# }
+compile_total_cases_var = function(total){
+  count <- 1
+  for (i in list_all){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  for (i in list_all_var){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  for (i in list_kids){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  for (i in list_kids_var){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  for (i in list_adults){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  for (i in list_adults_var){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  for (i in list_elderly){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  for (i in list_elderly_var){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  for (i in list_twentyplus){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  for (i in list_twentyplus_var){
+    total[count] <- compute_total_cases_new(i)
+    count <- count + 1
+  }
+  
+  total
+}
+
+compile_total_deaths = function(total){
+  count <- 1
+  for (i in list_all){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  for (i in list_kids){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  for (i in list_adults){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  for (i in list_elderly){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  for (i in list_twentyplus){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  
+  total
+}
+
+compile_total_deaths_var = function(total){
+  count <- 1
+  for (i in list_all){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  for (i in list_all_var){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  for (i in list_kids){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  for (i in list_kids_var){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  for (i in list_adults){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  for (i in list_adults_var){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  for (i in list_elderly){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  for (i in list_elderly_var){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  for (i in list_twentyplus){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  for (i in list_twentyplus_var){
+    total[count] <- compute_total_deaths_new(i)
+    count <- count + 1
+  }
+  total
+}
+
+compile_total_YLL = function(total){
+  count <- 1
+  for (i in list_all){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  for (i in list_kids){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  for (i in list_adults){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  for (i in list_elderly){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  for (i in list_twentyplus){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  
+  total
+}
+
+compile_total_YLL_var = function(total){
+  count <- 1
+  for (i in list_all){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  for (i in list_all_var){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  for (i in list_kids){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  for (i in list_kids_var){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  for (i in list_adults){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  for (i in list_adults_var){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  for (i in list_elderly){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  for (i in list_elderly_var){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  for (i in list_twentyplus){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  for (i in list_twentyplus_var){
+    total[count] <- compute_total_YLL_new(i)
+    count <- count + 1
+  }
+  total
+}
+
+
+get_reduction_df = function(outcome){
+  total <- rep(NA, 255)
+  
+  if (outcome == "cases"){
+    total <- compile_total_cases(total)
+    baseline <- compute_total_cases_new(list_all$`0`)
+  } else if (outcome == "deaths"){
+    total <- compile_total_deaths(total)
+    baseline <- compute_total_deaths_new(list_all$`0`)
+  } else if (outcome == "YLL"){
+    total <- compile_total_YLL(total)
+    baseline <- compute_total_YLL_new(list_all$`0`)
+  }
+
+  num_strategies <- 5
+  vax_avail <- c(rep(seq(0, 50, by = 1), num_strategies))
+  num_per_list <- 51
+  strat <- c(rep("all", num_per_list), rep("kids", num_per_list), 
+             rep("adults", num_per_list), rep("elderly", num_per_list), 
+             rep("twentyplus", num_per_list))
+  variable <-  c(rep("constant", num_per_list))
+  
+  
+  baseline <- c(rep(baseline, num_per_list))
+  
+  reduction <- (1-(total/baseline))*100
+  
+  df <- data.frame(vax_avail, strat, reduction, variable)
+}
+
+get_reduction_df_var = function(outcome){
+  total <- rep(NA, 510)
+  
+  if (outcome == "cases"){
+    total <- compile_total_cases_var(total)
+    baseline <- compute_total_cases_new(list_all$`0`)
+    baseline_var <- compute_total_cases_new(list_all_var$`0`)
+  } else if (outcome == "deaths"){
+    total <- compile_total_deaths_var(total)
+    baseline <- compute_total_deaths_new(list_all$`0`)
+    baseline_var <- compute_total_deaths_new(list_all_var$`0`)
+  } else if (outcome == "YLL"){
+    total <- compile_total_YLL_var(total)
+    baseline <- compute_total_YLL_new(list_all$`0`)
+    baseline_var <- compute_total_YLL_new(list_all_var$`0`)
+  }
+  
+  num_strategies <- 5
+  vax_avail <- c(rep(seq(0, 50, by = 1), num_strategies*2))
+  num_per_list <- 51
+  strat <- c(rep("all", num_per_list*2), 
+             rep("kids", num_per_list*2), 
+             rep("adults", num_per_list*2),
+             rep("elderly", num_per_list*2), 
+             rep("twentyplus", num_per_list*2))
+  temp <-  c(rep("constant", num_per_list), rep("var", num_per_list))
+  variable <- c(rep(temp, num_strategies))
+  
+  temp <- c(rep(baseline, num_per_list), rep(baseline_var, num_per_list))
+  baseline <- c(rep(temp, num_strategies))
+  
+  reduction <- (1-(total/baseline))*100
+  
+  df <- data.frame(vax_avail, strat, reduction, variable)
+}
 
 get_reduction_in_cases_df_new = function(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var){
   total_cases <- rep(NA, 510)
@@ -1119,15 +1254,11 @@ get_reduction_in_cases_df_novar = function(){
   df <- data.frame(vax_avail, strat, reduction, variable)
 }
 
-get_reduction_in_deaths_df = function(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var){
-  total_deaths <- rep(NA, 510)
+get_reduction_in_deaths_df = function(){
+  total_deaths <- rep(NA, 255)
   
   count <- 1
   for (i in list_all){
-    total_deaths[count] <- compute_total_deaths(i)
-    count <- count + 1
-  }
-  for (i in list_all_var){
     total_deaths[count] <- compute_total_deaths(i)
     count <- count + 1
   }
@@ -1135,15 +1266,7 @@ get_reduction_in_deaths_df = function(list_all_var, list_kids_var, list_adults_v
     total_deaths[count] <- compute_total_deaths(i)
     count <- count + 1
   }
-  for (i in list_kids_var){
-    total_deaths[count] <- compute_total_deaths(i)
-    count <- count + 1
-  }
   for (i in list_adults){
-    total_deaths[count] <- compute_total_deaths(i)
-    count <- count + 1
-  }
-  for (i in list_adults_var){
     total_deaths[count] <- compute_total_deaths(i)
     count <- count + 1
   }
@@ -1151,32 +1274,19 @@ get_reduction_in_deaths_df = function(list_all_var, list_kids_var, list_adults_v
     total_deaths[count] <- compute_total_deaths(i)
     count <- count + 1
   }
-  for (i in list_elderly_var){
-    total_deaths[count] <- compute_total_deaths(i)
-    count <- count + 1
-  }
   for (i in list_twentyplus){
-    total_deaths[count] <- compute_total_deaths(i)
-    count <- count + 1
-  }
-  for (i in list_twentyplus_var){
     total_deaths[count] <- compute_total_deaths(i)
     count <- count + 1
   }
   
   num_strategies <- 5
-  vax_avail <- c(rep(seq(0, 50, by = 1), num_strategies*2))
+  vax_avail <- c(rep(seq(0, 50, by = 1), num_strategies))
   num_per_list <- 51
-  strat <- c(rep("all", num_per_list*2), rep("kids", num_per_list*2), 
-             rep("adults", num_per_list*2), rep("elderly", num_per_list*2), 
+  strat <- c(rep("all", num_per_list*2), rep("kids", num_per_list), 
+             rep("adults", num_per_list*2), rep("elderly", num_per_list), 
              rep("twentyplus", num_per_list*2))
-  temp <-  c(rep("constant", num_per_list), rep("var", num_per_list))
-  variable <- c(rep(temp, num_strategies))
   
   baseline_deaths <- compute_total_deaths(list_all$`0`)
-  baseline_deaths_var <- compute_total_deaths(list_all_var$`0`)
-  
-  temp <- c(rep(baseline_deaths, num_per_list), rep(baseline_deaths_var, num_per_list))
   baseline_deaths <- c(rep(temp, num_strategies))
   
   reduction <- (1 - (total_deaths/baseline_deaths))*100
@@ -1472,7 +1582,104 @@ get_reduction_in_YLL_df_single = function(this_list){
 }
 
 # Plot trajectories ----
-plot_allages_onestrategy =function(df, compartment){
+get_rowindex <- function(df, rName) {
+  which(match(colnames(df), rName) == 1)
+  }
+
+gather_compartments_overtime <- function(df, compartment, strat){
+  final_time <- as.numeric(dim(df)[1])-1
+  
+  if (compartment == "I"){
+    start <- "I1"
+    end <- "Ix9"
+  } else if (compartment == "R"){
+    start <- "R1"
+    end <- "D9"
+  } else if (compartment == "D"){
+    start <- "D1"
+    end <- "D9"
+  }
+  
+  total_df <- data.frame(time = 0:final_time,
+                         percent = ((apply(df[, get_rowindex(df, start):get_rowindex(df, end)], 
+                                        1, sum))/pop_total)*100,
+                         strat = rep(strat, final_time + 1))
+}
+
+plot_strat_overtime = function(compartment, df_baseline, df_all, df_adults, df_kids, df_twentyplus, 
+                               df_elderly, this_time) {
+  df_baseline <- gather_compartments_overtime(df_baseline, compartment, "no vax")
+  df_all <- gather_compartments_overtime(df_all, compartment, "all")
+  df_adults <- gather_compartments_overtime(df_adults, compartment, "adults")
+  df_kids <- gather_compartments_overtime(df_kids, compartment, "kids")
+  df_twentyplus <- gather_compartments_overtime(df_twentyplus, compartment, "twentyplus")
+  df_elderly <- gather_compartments_overtime(df_elderly, compartment, "elderly")
+  
+  df <- rbind(df_adults, df_all, df_elderly, df_kids, df_twentyplus)
+  
+  p <- ggplot(df, aes(x = time, y = percent)) +
+    theme_minimal(base_size = 12) +
+    annotate("rect", xmin=0, xmax=this_time, ymin=0, ymax=Inf, alpha=0.5, fill= "#dddddd") +
+    geom_line(data = df_baseline, aes(x = time, y = percent), col = "#4F4F4F", size = 0.5, 
+              linetype = "dashed") +
+    geom_line(aes(color = strat), size = 0.5) +
+    xlab("Time (days)") +
+    scale_x_continuous(expand = c(0,0), limit = c(0, 250)) +#, breaks = c(0, 100, 200, 300)) +
+    scale_color_brewer(palette = "Dark2", name = "Allocation Strategy",
+                       labels =  c("Adults 20-49", "All Ages", "Adults 60+", 
+                                   "Under 20", "Adults 20+")) +
+    theme(legend.position = "none") 
+  
+  if (compartment == "I") {
+    ymax <- 4
+    p <- p + ylab("\nInfected (%)")
+  } else if (compartment == "R") {
+    ymax <- 60
+    p <- p + ylab("Cumulative\nincidence (%)")
+  } else if (compartment == "D") {
+    ymax <- 0.6
+    p <- p + ylab("Cumulative\nmortality (%)") 
+  }
+  
+  p <- p + scale_y_continuous(expand = c(0,0), limit = c(0, ymax)) + 
+    coord_fixed(250*4/(5*ymax))
+}
+
+gather_compartments_byage <- function(df, compartment, age_group){
+  final_time <- as.numeric(dim(df)[1])-1
+  
+  if (compartment == "I"){
+    this_comp   <- paste0("I", age_group)
+    this_comp_v <- paste0("Iv", age_group)
+    this_comp_x <- paste0("Ix", age_group)
+    
+    total_df <- data.frame(time = 0:final_time,
+                           percent = ((df[, get_rowindex(df, this_comp)] + 
+                                               df[, get_rowindex(df, this_comp_v)] +
+                                               df[, get_rowindex(df, this_comp_x)])/pop_total)*100,
+                           age_group = rep(age_group, final_time + 1))
+  } else if (compartment == "R"){
+    this_comp   <- paste0("R", age_group)
+    this_comp_v <- paste0("Rv", age_group)
+    this_comp_x <- paste0("Rx", age_group)
+    this_comp_d <- paste0("D", age_group)
+    
+    total_df <- data.frame(time = 0:final_time,
+                           percent = ((df[, get_rowindex(df, this_comp)] + 
+                                               df[, get_rowindex(df, this_comp_v)] +
+                                               df[, get_rowindex(df, this_comp_x)] + 
+                                               df[, get_rowindex(df, this_comp_d)])/pop_total)*100,
+                           age_group = rep(age_group, final_time + 1))
+  } else if (compartment == "D"){
+    this_comp <- paste0("D", age_group)
+    
+    total_df <- data.frame(time = 0:final_time,
+                           percent = ((df[, get_rowindex(df, this_comp)])/pop_total)*100,
+                           age_group = rep(age_group, final_time + 1))
+  }
+}
+
+plot_allages_onestrategy = function(this_df, compartment, this_time, groups, this_col){
   # INPUTS:
   # df: simulation to plot
   # compartment: character of compartment to plot i.e. "I", "R"
@@ -1480,82 +1687,144 @@ plot_allages_onestrategy =function(df, compartment){
   # OUTPUT:
   # p: ggplot object of plot
   
-  # Dataframe for total number of infections/recoveries
-  final_time <- as.numeric(dim(df)[1])-1
-  
-  total_df <- data.frame(time = 0:final_time,
-                         Infected = apply(df[20:28], 1, sum),
-                         Recovered = apply(df[29:37], 1, sum), 
-                         Vaccinated = apply(df[38:46], 1, sum))
-  
-  total_df <- total_df %>%
-    select(time, Infected) %>%
-    gather(key = "Compartment", value = "num", -time)
-  
-  total_df$percent <- total_df$num/pop_total*100
-  
-  # Dataframe for infections by age
-  col_to_gather <- vector(mode="character", length=num_groups)
-  for (i in 1:9) {col_to_gather[i] <- paste0(compartment,i)}
-  
-  new_df <- df %>%
-    select(time, all_of(col_to_gather)) %>%
-    gather(key = "age_group", value = "num", -time)
-  
-  # Add col for percent infected & recovered
-  new_df$percent <- new_df$num
-  for (i in 1:length(new_df$num)){
-    if (new_df$age_group[i] == col_to_gather[1]) {new_df$percent[i] <- new_df$percent[i]/N[1]}
-    else if (new_df$age_group[i] == col_to_gather[2]) {new_df$percent[i] <- new_df$percent[i]/N[2]}
-    else if (new_df$age_group[i] == col_to_gather[3]) {new_df$percent[i] <- new_df$percent[i]/N[3]}
-    else if (new_df$age_group[i] == col_to_gather[4]) {new_df$percent[i] <- new_df$percent[i]/N[4]}
-    else if (new_df$age_group[i] == col_to_gather[5]) {new_df$percent[i] <- new_df$percent[i]/N[5]}
-    else if (new_df$age_group[i] == col_to_gather[6]) {new_df$percent[i] <- new_df$percent[i]/N[6]}
-    else if (new_df$age_group[i] == col_to_gather[7]) {new_df$percent[i] <- new_df$percent[i]/N[7]}
-    else if (new_df$age_group[i] == col_to_gather[8]) {new_df$percent[i] <- new_df$percent[i]/N[8]}
-    else if (new_df$age_group[i] == col_to_gather[9]) {new_df$percent[i] <- new_df$percent[i]/N[9]}
+  df_toplot <- data.frame()
+  for (i in 1:9) {
+    temp <- gather_compartments_byage(this_df, compartment, i)
+    df_toplot <- rbind(df_toplot, temp)
   }
-  new_df$percent <- new_df$percent * 100
   
   # Plot
-  theme_set(theme_minimal(base_size = 12))
+  p <- ggplot(df_toplot[!(df_toplot$age_group %in% groups),], aes(x = time, y = percent)) +
+    annotate("rect", xmin=0, xmax=this_time, ymin=0, ymax=Inf, alpha=0.5, fill="#dddddd") +
+    geom_line(aes(group = factor(age_group)), size = 0.4, col = "#cccccc") +
+    xlab("Time (Days)") +
+    scale_x_continuous(expand = c(0,0),limit = c(0, 250), breaks = c(0,100,200)) +
+    # col_grey + 
+    theme(legend.position = "none") 
   
-  # string_to_add <- paste0("Total infected: ", round(compute_total_cases(df),3), "%")
-  
-  # Create a text
-  # grob <- grobTree(textGrob(string_to_add, x=0.5,  y=0.95, hjust=0,
-  #                           gp=gpar(col="white", fontsize=13, fontface="bold")))
-  
-  # p <- ggplot(total_df, aes(x = time, y = percent)) +
-  #   theme_classic(base_size = 25) +
-  #   geom_hline(yintercept = max(total_df$percent), color = "#b7b7b7ff", linetype = "dashed", size = 1.7) +
-  #   geom_line(color = "#595959", size = 2) +
-  #   xlab("Time") +
-  #   scale_x_continuous(expand = c(0,0),limit = c(0,400), breaks = c(0,40,80,120)) +
-  #   scale_y_continuous(expand = c(0,0),limit = c(0,20), breaks=c(0, round(max(total_df$percent),1), 20)) +
-  #   ylab("Infected (%)")
-  
-  p <- ggplot(new_df, aes(x = time, y = percent)) +
-    theme_classic(base_size = 25) +
-    geom_line(aes(color = age_group), size = 2) +
-    xlab("Time") +
-    scale_x_continuous(expand = c(0,0),limit = c(0,final_time)) +
-    # annotation_custom(grob) +
-    scale_color_brewer(palette = "Spectral", name = "Age Group",
-                       labels =  c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+"))
-  
+  p <- p + geom_line(data = df_toplot[df_toplot$age_group %in% groups,],
+                     aes(x = time, y = percent, group = factor(age_group)),
+                     color = this_col, size = 0.4)
   if (compartment == "I") {
-    p <- p + ylab("Infected (%)") +
-      scale_y_continuous(expand = c(0,0), limit = c(0,15), breaks=c(0, 10, 20))
+    ymax <- 0.7
+    p <- p + ylab("\nInfected (%)") + 
+      scale_y_continuous(expand = c(0,0), limit = c(0, ymax))#E, breaks = c(0, 1, 2))
   } else if (compartment == "R") {
-    p <- p + ylab("Percent Recovered") + ylim(0,100)
-  } else if (compartment == "V") {
-    p <- p + ylab("Percent Vaccinated") + ylim(0,100)
+    ymax <- 10
+    p <- p + ylab("Cumulative\nincidence (%)") + 
+      scale_y_continuous(expand = c(0,0), limit = c(0, ymax), breaks = c(0, 5, 10, 15))
+  } else if (compartment == "D") {
+    ymax <- 0.3
+    p <- p + ylab("Cumulative\nmortality (%)") + 
+      scale_y_continuous(expand = c(0,0), limit = c(0, ymax))#, breaks = c(0, 0.25, 0.5))
   }
+  p <- p + coord_fixed(250*2/(3.5*ymax))
+}
+
+plot_supp_dynamics_panel = function(compartment){
+  t_one <- 11
+  infect_10 <- plot_strat_overtime(compartment, list_all[[1]], list_all[[t_one]], list_adults[[t_one]], 
+                                   list_kids[[t_one]], list_twentyplus[[t_one]], list_elderly[[t_one]], 50) +
+    alllabels_theme +
+    theme(axis.title.x = element_blank()) + 
+    theme(axis.title.y = element_blank()) + 
+    ggtitle("10% vaccine supply") + 
+    theme(plot.title = element_text(color = "black"))
   
+  t_two <- 31
+  infect_30 <- plot_strat_overtime(compartment, list_all[[1]], list_all[[t_two]], list_adults[[t_two]], 
+                                   list_kids[[t_two]], list_twentyplus[[t_two]], list_elderly[[t_two]], 150) + 
+    onlyx_theme + 
+    theme(axis.title.x = element_blank()) + 
+    ggtitle("30% vaccine supply") + 
+    theme(plot.title = element_text(color = "black"))
+  
+  ###
+  shading1 <- 50
+  shading2 <- 150
+  infect_none1 <- plot_allages_onestrategy(list_elderly[[1]], compartment, 0, NA, "#cccccc") + 
+    onlyy_theme +
+    theme(axis.title.y = element_blank())
+  infect_adults1 <- plot_allages_onestrategy(list_adults[[t_one]], compartment, shading1, 3:5, col_youngadults) + 
+    onlyy_theme + 
+    theme(axis.title.y = element_blank())
+  infect_elderly1 <- plot_allages_onestrategy(list_elderly[[t_one]], compartment, shading1, 7:9, col_elderly) + 
+    alllabels_theme +
+    theme(axis.title.x = element_blank()) + 
+    theme(axis.title.y = element_blank())
+  infect_all1 <- plot_allages_onestrategy(list_all[[t_one]], compartment, shading1, 1:9, col_all) + 
+    onlyx_theme +
+    theme(axis.title.x = element_blank()) 
+  infect_twentyplus1 <- plot_allages_onestrategy(list_twentyplus[[t_one]], compartment, shading1, 3:9, col_adults) + 
+    nolabels_theme
+  infect_kids1 <- plot_allages_onestrategy(list_kids[[t_one]], compartment, shading1, 1:2, col_kids) + 
+    nolabels_theme
+  
+  infect_none2 <- plot_allages_onestrategy(list_elderly[[1]], compartment, 0, NA, "#cccccc") + 
+    nolabels_theme
+  infect_adults2 <- plot_allages_onestrategy(list_adults[[t_two]], compartment, shading2, 3:5, col_youngadults) + 
+    nolabels_theme
+  infect_elderly2 <- plot_allages_onestrategy(list_elderly[[t_two]], compartment, shading2, 7:9, col_elderly) + 
+    alllabels_theme +
+    theme(axis.title.x = element_blank()) + 
+    theme(axis.title.y = element_blank()) + 
+    theme(axis.text.y = element_blank())
+  infect_all2 <- plot_allages_onestrategy(list_all[[t_two]], compartment, shading2, 1:9, col_all) + 
+    onlyx_theme +
+    theme(axis.title.x = element_blank()) 
+  infect_twentyplus2 <- plot_allages_onestrategy(list_twentyplus[[t_two]], compartment, shading2, 3:9, col_adults) + 
+    nolabels_theme
+  infect_kids2 <- plot_allages_onestrategy(list_kids[[t_two]], compartment, shading2, 1:2, col_kids) + 
+    nolabels_theme
+  
+  dynamics <- ggarrange(infect_none1, infect_kids1, infect_none2, infect_kids2,
+                             infect_adults1, infect_twentyplus1, infect_adults2, infect_twentyplus2,
+                             infect_elderly1, infect_all1, infect_elderly2, infect_all2,
+                             nrow = 3)
+
+  panel_infect_strat <- ggarrange(infect_10, infect_30,
+                                  nrow = 1)
+  # export as 8x4.25
+  if (compartment == "I") {
+    grid.arrange(panel_infect_strat, dynamics,
+                 heights = c(1, 1),
+                 bottom = "Time (days)",
+                 left = "Infected (% of total population)",
+                 right = "")
+  } else if (compartment == "R"){
+    grid.arrange(panel_infect_strat, dynamics,
+                 heights = c(1, 1),
+                 bottom = "Time (days)",
+                 left = "Cumulative incidence (% of total population)",
+                 right = "")
+  } else {
+    grid.arrange(panel_infect_strat, dynamics,
+                 heights = c(1, 1),
+                 bottom = "Time (days)",
+                 left = "Cumulative mortality since initial vaccine rollout\n(% of total population)",
+                 right = "")
+  }
 }
 
 # Bar plots ----
+plot_vaxdist_hist = function(){
+  p1 <- barplot_vax_strat("kids") + 
+    theme(axis.title.y = element_blank())
+  p2 <- barplot_vax_strat("adults") + 
+    theme(axis.title.y = element_blank())
+  p3 <- barplot_vax_strat("20+") + 
+    theme(axis.title.y = element_blank())
+  p4 <- barplot_vax_strat("elderly") + 
+    theme(axis.title.y = element_blank())
+  p5 <- barplot_vax_strat("all") + 
+    theme(axis.title.y = element_blank())
+  
+  panel <- ggarrange(p1, p2, p3, p4, p5,
+                     nrow = 5,
+                     left = textGrob("Distribution of vaccines (%)", rot = 90, hjust = 0.5),
+                     bottom = textGrob("Age (years)", vjust = 0))
+}
+
 barplot_vax_strat = function(strategy){
   if (strategy == "no vax"){
     vaccinated <- rep(0,num_groups) * 100
@@ -1632,79 +1901,79 @@ barplot_vax_strat = function(strategy){
 }
 
 # Plot over vaccine avaliablity ----
-plot_over_vax_avail = function(outcome, var_name, list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var){
-  
-  theme_set(theme_minimal(base_size = 12))
-  
-  percent_kids <- ceiling(sum(age_demo[1:2])*100)
-  percent_elderly <- ceiling(sum(age_demo[7:9])*100)
-  percent_adults <- ceiling(sum(age_demo[3:5])*100)
-  percent_twentyplus <- ceiling(sum(age_demo[3:9])*100)
-  
-  # get dataframe for specific outcome
-  if (outcome == "cases"){
-    df <- get_reduction_in_cases_df(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var)
-  } else if (outcome == "deaths"){
-    df <- get_reduction_in_deaths_df(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var)
-    #df <- rbind(df[df$variable == "var", ], optimal_df_C[optimal_df_C$variable == "var", ])
-  } else if (outcome == "YLL"){
-    df <- get_reduction_in_YLL_df(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var)
-  }
-  
-  # lines stop when age groups are completely vaccinated
-  # if (percent_kids < 50){df[df$strat == "kids" & df$vax_avail > percent_kids, ]$reduction = NA}
-  # if (percent_elderly < 50) {df[df$strat == "elderly" & df$vax_avail > percent_elderly, ]$reduction = NA}
-  # if (percent_adults < 50) {df[df$strat == "adults" & df$vax_avail > percent_adults, ]$reduction = NA}
-  # if (percent_twentyplus < 50) {df[df$strat == "twentyplus" & df$vax_avail > percent_twentyplus, ]$reduction = NA}
-  # 
-  
-  # reallocate to everyone after age groups are completely vaccinated according to the strat
-  points_x <- c(percent_kids, percent_elderly, percent_adults)
-  
-  points_y <- c(df[df$strat == "kids" & df$vax_avail == floor(percent_kids) & df$variable == "constant", ]$reduction,
-                df[df$strat == "elderly" & df$vax_avail == floor(percent_elderly) & df$variable == "constant", ]$reduction,
-                df[df$strat == "adults" & df$vax_avail == floor(percent_adults) & df$variable == "constant", ]$reduction)
-  points_y_var <- c(df[df$strat == "kids" & df$vax_avail == floor(percent_kids) & df$variable == "var", ]$reduction,
-                    df[df$strat == "elderly" & df$vax_avail == floor(percent_elderly) & df$variable == "var", ]$reduction,
-                    df[df$strat == "adults" & df$vax_avail == floor(percent_adults) & df$variable == "var", ]$reduction)
-  points <- data.frame(points_x, points_y)
-  
-  # plot
-  # for fig 2
-  df_var <- df[df$variable == "var", ]
-  df_const <- df[df$variable == "constant", ]
-  p <- ggplot() +
-    # geom_line(aes(x = df$vax_avail, y = df$reduction, col = df$strat, linetype = df$variable), size = 2, alpha = 0.9) +
-    geom_line(aes(x = df_var$vax_avail, y = df_var$reduction, col = df_var$strat), linetype = "dashed", size = 2, alpha = 0.9) +
-    geom_line(aes(x = df_const$vax_avail, y = df_const$reduction, col = df_const$strat), linetype = "solid", size = 1.2, alpha = 0.9) +
-    xlab("Total vaccine supply (% of pop)") +
-    scale_color_brewer(palette = "Dark2", name = "Allocation Strategy",
-                       labels =  c("Adults 20-49", "All Ages", "Adults 60+", 
-                                   "Under 20", "Adults 20+")) +
-    scale_linetype_discrete(name = var_name,
-                            labels = c("Constant", "Age-dependent")) +
-    scale_y_continuous(expand = c(0,0), limit = c(0, 100.2)) +
-    scale_x_continuous(expand = c(0,0), limit = c(0, 50)) +#, breaks = c(0,25,50)) +
-    #ggtitle(paste0(country)) +
-    theme(legend.position = "none",
-          #axis.title.x =element_blank(),
-          #axis.text.x  = element_blank(),
-          #axis.text.y  = element_blank(),
-          #axis.title.y = element_blank()
-    ) +
-    theme(legend.text = element_text(size=22),
-          legend.title = element_text(size =22),
-          title = element_text(size = 22)) +
-    guides(colour = guide_legend(override.aes = list(size=6)))
-  
-  p <- p + geom_point(aes(x = points_x, y = points_y), size = 2) + 
-    geom_point(aes(x = points_x, y = points_y_var), size = 2) 
-  
-  if (outcome == "cases"){ p <- p + ylab("Reduction in infections (%)")}
-  else if (outcome == "deaths"){ p <- p + ylab("Reduction in deaths (%)")}
-  else if (outcome == "YLL"){ p <- p + ylab("Reduction in YLL (%)")}
-  return(p)
-}
+# plot_over_vax_avail = function(outcome, var_name, list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var){
+#   
+#   theme_set(theme_minimal(base_size = 12))
+#   
+#   percent_kids <- ceiling(sum(age_demo[1:2])*100)
+#   percent_elderly <- ceiling(sum(age_demo[7:9])*100)
+#   percent_adults <- ceiling(sum(age_demo[3:5])*100)
+#   percent_twentyplus <- ceiling(sum(age_demo[3:9])*100)
+#   
+#   # get dataframe for specific outcome
+#   if (outcome == "cases"){
+#     df <- get_reduction_in_cases_df(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var)
+#   } else if (outcome == "deaths"){
+#     df <- get_reduction_in_deaths_df(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var)
+#     #df <- rbind(df[df$variable == "var", ], optimal_df_C[optimal_df_C$variable == "var", ])
+#   } else if (outcome == "YLL"){
+#     df <- get_reduction_in_YLL_df(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var)
+#   }
+#   
+#   # lines stop when age groups are completely vaccinated
+#   # if (percent_kids < 50){df[df$strat == "kids" & df$vax_avail > percent_kids, ]$reduction = NA}
+#   # if (percent_elderly < 50) {df[df$strat == "elderly" & df$vax_avail > percent_elderly, ]$reduction = NA}
+#   # if (percent_adults < 50) {df[df$strat == "adults" & df$vax_avail > percent_adults, ]$reduction = NA}
+#   # if (percent_twentyplus < 50) {df[df$strat == "twentyplus" & df$vax_avail > percent_twentyplus, ]$reduction = NA}
+#   # 
+#   
+#   # reallocate to everyone after age groups are completely vaccinated according to the strat
+#   points_x <- c(percent_kids, percent_elderly, percent_adults)
+#   
+#   points_y <- c(df[df$strat == "kids" & df$vax_avail == floor(percent_kids) & df$variable == "constant", ]$reduction,
+#                 df[df$strat == "elderly" & df$vax_avail == floor(percent_elderly) & df$variable == "constant", ]$reduction,
+#                 df[df$strat == "adults" & df$vax_avail == floor(percent_adults) & df$variable == "constant", ]$reduction)
+#   points_y_var <- c(df[df$strat == "kids" & df$vax_avail == floor(percent_kids) & df$variable == "var", ]$reduction,
+#                     df[df$strat == "elderly" & df$vax_avail == floor(percent_elderly) & df$variable == "var", ]$reduction,
+#                     df[df$strat == "adults" & df$vax_avail == floor(percent_adults) & df$variable == "var", ]$reduction)
+#   points <- data.frame(points_x, points_y)
+#   
+#   # plot
+#   # for fig 2
+#   df_var <- df[df$variable == "var", ]
+#   df_const <- df[df$variable == "constant", ]
+#   p <- ggplot() +
+#     # geom_line(aes(x = df$vax_avail, y = df$reduction, col = df$strat, linetype = df$variable), size = 2, alpha = 0.9) +
+#     geom_line(aes(x = df_var$vax_avail, y = df_var$reduction, col = df_var$strat), linetype = "dashed", size = 2, alpha = 0.9) +
+#     geom_line(aes(x = df_const$vax_avail, y = df_const$reduction, col = df_const$strat), linetype = "solid", size = 1.2, alpha = 0.9) +
+#     xlab("Total vaccine supply (% of pop)") +
+#     scale_color_brewer(palette = "Dark2", name = "Allocation Strategy",
+#                        labels =  c("Adults 20-49", "All Ages", "Adults 60+", 
+#                                    "Under 20", "Adults 20+")) +
+#     scale_linetype_discrete(name = var_name,
+#                             labels = c("Constant", "Age-dependent")) +
+#     scale_y_continuous(expand = c(0,0), limit = c(0, 100.2)) +
+#     scale_x_continuous(expand = c(0,0), limit = c(0, 50)) +#, breaks = c(0,25,50)) +
+#     #ggtitle(paste0(country)) +
+#     theme(legend.position = "none",
+#           #axis.title.x =element_blank(),
+#           #axis.text.x  = element_blank(),
+#           #axis.text.y  = element_blank(),
+#           #axis.title.y = element_blank()
+#     ) +
+#     theme(legend.text = element_text(size=22),
+#           legend.title = element_text(size =22),
+#           title = element_text(size = 22)) +
+#     guides(colour = guide_legend(override.aes = list(size=6)))
+#   
+#   p <- p + geom_point(aes(x = points_x, y = points_y), size = 2) + 
+#     geom_point(aes(x = points_x, y = points_y_var), size = 2) 
+#   
+#   if (outcome == "cases"){ p <- p + ylab("Reduction in infections (%)")}
+#   else if (outcome == "deaths"){ p <- p + ylab("Reduction in deaths (%)")}
+#   else if (outcome == "YLL"){ p <- p + ylab("Reduction in YLL (%)")}
+#   return(p)
+# }
 
 ve_legend = function(){
   
@@ -1725,7 +1994,7 @@ ve_legend = function(){
     list_twentyplus_var[[paste0(i)]] <- run_sim_new(C, j, "twentyplus", 1, v_e_type, v_e_var)
   }
 
-  df <- get_reduction_in_cases_df(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var)
+  df <- get_reduction_in_cases_df_new(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var)
 
   p <- ggplot(df, aes(x = vax_avail, y = reduction, fill = strat)) +
     geom_line(size = 1, alpha = 1, aes(linetype = variable))+
@@ -1760,7 +2029,7 @@ color_legend = function(){
     list_twentyplus[[paste0(i)]] <- run_sim_new(C, j, "twentyplus", 1, v_e_type, this_v_e)
   }
   
-  df <- get_reduction_in_cases_df_new(list_all , list_kids , list_adults , list_elderly , list_twentyplus )
+  df <- get_reduction_df("cases")
   
   p <- ggplot(df, aes(x = vax_avail, y = reduction, col = strat)) +
     geom_line(size = 1, alpha = 1)+
@@ -1800,7 +2069,7 @@ sero_legend = function(){
     list_twentyplus_var[[paste0(i)]] <- run_sim_new(C, j, "twentyplus", 1, v_e_type, v_e_var)
   }
   
-  df <- get_reduction_in_cases_df_new(list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var)
+  df <- get_reduction_df_var()
   
   p <- ggplot(df, aes(x = vax_avail, y = reduction, fill = strat)) +
     geom_line(size = 1, alpha = 1, aes(linetype = variable))+
@@ -1841,6 +2110,80 @@ when_strat_switch = function(list_df, groups){
   return(x_switch)
 }
 
+plot_over_vax_avail = function(outcome, var = FALSE){
+  library(ggplot2)
+  theme_set(theme_minimal(base_size = 12))
+  
+  x_adults_switch     <- when_strat_switch(list_adults, 3:5)
+  x_kids_switch       <- when_strat_switch(list_kids, 1:2)
+  x_elderly_switch    <- when_strat_switch(list_elderly, 7:9)
+  x_twentyplus_switch <- when_strat_switch(list_twentyplus, 3:9)
+  
+  # get dataframe for specific outcome
+  if (var){
+    df <- get_reduction_df_var(outcome)
+    
+    x_adults_switch_var     <- when_strat_switch(list_adults_var, 3:5)
+    x_kids_switch_var       <- when_strat_switch(list_kids_var, 1:2)
+    x_elderly_switch_var    <- when_strat_switch(list_elderly_var, 7:9)
+    x_twentyplus_switch_var <- when_strat_switch(list_twentyplus_var, 3:9)
+  } else {df <- get_reduction_df(outcome)}
+  
+  points_x <- c(x_kids_switch, x_elderly_switch)
+  points_y <- c(df[df$strat == "kids" & df$vax_avail == x_kids_switch & df$variable == "constant", ]$reduction,
+                df[df$strat == "elderly" & df$vax_avail == x_elderly_switch & df$variable == "constant", ]$reduction)
+  
+  if (x_adults_switch > 0){
+    points_x <- c(points_x, x_adults_switch)
+    points_y <- c(points_y, df[df$strat == "adults" & df$vax_avail == x_adults_switch & df$variable == "constant", ]$reduction)
+  }
+  if (x_twentyplus_switch > 0){
+    points_x <- c(points_x, x_twentyplus_switch)
+    points_y <- c(points_y, df[df$strat == "twentyplus" & df$vax_avail == x_twentyplus_switch & df$variable == "constant", ]$reduction)
+  }
+  
+  if (var){
+    points_x <- c(points_x, x_kids_switch_var, x_elderly_switch_var)
+    points_y <- c(points_y, df[df$strat == "kids" & df$vax_avail == x_kids_switch_var & df$variable == "var", ]$reduction,
+                  df[df$strat == "elderly" & df$vax_avail == x_elderly_switch_var & df$variable == "var", ]$reduction)
+    
+    if (x_adults_switch_var > 0){
+      points_x <- c(points_x, x_adults_switch_var)
+      points_y <- c(points_y, df[df$strat == "adults" & df$vax_avail == x_adults_switch_var & df$variable == "var", ]$reduction)
+    }
+    if (x_twentyplus_switch_var > 0){
+      points_x <- c(points_x, x_twentyplus_switch_var)
+      points_y <- c(points_y, df[df$strat == "twentyplus" & df$vax_avail == x_twentyplus_switch_var & df$variable == "var", ]$reduction)
+    }
+  }
+  
+  df_var <- df[df$variable == "var", ]
+  df_const <- df[df$variable == "constant", ]
+
+  # plot
+  p <- ggplot() +
+    geom_line(aes(x = df_const$vax_avail, y = df_const$reduction, col = df_const$strat),
+              size = 0.5, alpha = 0.9) +
+    geom_line(aes(x = df_var$vax_avail, y = df_var$reduction, col = df_var$strat), 
+              linetype = "dashed", size = 1, alpha = 0.9) +
+    xlab("Total vaccine supply (% of population)") +
+    scale_color_brewer(palette = "Dark2", name = "Allocation Strategy",
+                       labels =  c("Adults 20-49", "All Ages", "Adults 60+", 
+                                   "Under 20", "Adults 20+")) +
+    scale_y_continuous(expand = c(0,0), limit = c(0, 75), breaks = c(0, 25, 50, 75)) +
+    scale_x_continuous(expand = c(0,0), limit = c(0, 50)) +#, breaks = c(0,25,50)) +
+    coord_fixed(50*4/(5*75)) +
+    theme(legend.position = "none") +
+    guides(colour = guide_legend(override.aes = list(size=3)))
+  
+  p <- p + geom_point(aes(x = points_x, y = points_y), size = 1) 
+  
+  if (outcome == "cases"){ p <- p + ylab("Reduction in\ninfections (%)")}
+  else if (outcome == "deaths"){ p <- p + ylab("Reduction in\ndeaths (%)")}
+  else if (outcome == "YLL"){ p <- p + ylab("Reduction in\nYLL (%)")}
+  return(p)
+}
+
 plot_over_vax_avail_new = function(outcome, var_name, list_all_var, list_kids_var, list_adults_var, list_elderly_var, list_twentyplus_var){
   library(ggplot2)
   theme_set(theme_minimal(base_size = 12))
@@ -1859,15 +2202,12 @@ plot_over_vax_avail_new = function(outcome, var_name, list_all_var, list_kids_va
   if (outcome == "cases"){
     df <- get_reduction_in_cases_df_new(list_all_var, list_kids_var, list_adults_var, list_elderly_var, 
                                         list_twentyplus_var)
-    # df <- rbind(df, optimal_df_cases)
   } else if (outcome == "deaths"){
     df <- get_reduction_in_deaths_df_new(list_all_var, list_kids_var, list_adults_var, list_elderly_var, 
                                          list_twentyplus_var)
-    # df <- rbind(df, optimal_df_deaths)
   } else if (outcome == "YLL"){
     df <- get_reduction_in_YLL_df_new(list_all_var, list_kids_var, list_adults_var, list_elderly_var, 
                                       list_twentyplus_var)
-    # df <- rbind(df, optimal_df_YLL)
   }
   
   # reallocate to everyone after age groups are completely vaccinated according to the strat
@@ -1895,11 +2235,7 @@ plot_over_vax_avail_new = function(outcome, var_name, list_all_var, list_kids_va
     # geom_line(aes(x = df_var$vax_avail, y = df_var$reduction, col = df_var$strat), 
     #          linetype = "dashed", size = 1, alpha = 0.9) +
     geom_line(aes(x = df_const$vax_avail, y = df_const$reduction, col = df_const$strat), 
-              linetype = "solid", size = 1, alpha = 0.9) +
-    geom_line(aes(x = df_var[df_var$strat == "optimal",]$vax_avail, 
-                  y = df_var[df_var$strat == "optimal",]$reduction, 
-                  col = df_var[df_var$strat == "optimal",]$strat),
-              linetype = "solid", size = 1, alpha = 0.9) +
+              linetype = "solid", size = 0.5, alpha = 0.9) +
     xlab("Total vaccine supply (% of population)") +
     scale_color_brewer(palette = "Dark2", name = "Allocation Strategy",
                        labels =  c("Adults 20-49", "All Ages", "Adults 60+", 
@@ -1912,8 +2248,8 @@ plot_over_vax_avail_new = function(outcome, var_name, list_all_var, list_kids_va
     theme(legend.position = "none") +
     guides(colour = guide_legend(override.aes = list(size=3)))
   
-  p <- p + geom_point(aes(x = points_x, y = points_y), size = 1.5) + 
-    geom_point(aes(x = points_x_var, y = points_y_var), size = 1.5) 
+  p <- p + geom_point(aes(x = points_x, y = points_y), size = 1) + # size = 1.5
+    geom_point(aes(x = points_x_var, y = points_y_var), size = 1) 
   
   if (outcome == "cases"){ p <- p + ylab("Reduction in\ninfections (%)")}
   else if (outcome == "deaths"){ p <- p + ylab("Reduction in\ndeaths (%)")}
@@ -2284,6 +2620,30 @@ plot_serotesting_over_vax_avail = function(outcome){
 }
 
 # Other plotting fn ----
+plot_age_dep_ve = function() {
+# age-dependent ve plot
+  groups <- c(0,10,20,30,40,50,60,70,80,90)
+  v_e_plot <- v_e_var
+  v_e_plot[10] <- v_e_var[9]
+  
+  df <- data.frame(groups, v_e_plot)
+  
+  age_dep_ve <- ggplot(df, aes(x = groups, y = v_e_plot*100)) +
+    geom_step(size = 0.8, linetype = "dashed") +
+    geom_hline(yintercept = 90, size = 0.5) +
+    geom_point(aes(x = 60, y = 90), size = 2) +
+    geom_point(aes(x = 89.5, y = 50), size = 2) +
+    ylab("Efficacy (%)") +
+    scale_y_continuous(expand = c(0,0), limit = c(0, 100), breaks = c(0, 25, 50, 75, 100)) +
+    scale_x_continuous(expand = c(0,0), limit = c(0, 90.2), breaks = c(0,20,40,60,80),
+                       labels = c(0,20,40,60,80)) +
+    #theme(panel.grid.minor = element_blank()) +
+    xlab("Age (years)") +
+    theme(#axis.text = element_text(size = 9),
+          axis.title.y = element_text(vjust = 0.2)) +
+    coord_fixed(90*4/(5*100)) 
+}
+
 plot_heatmap = function(data, num, param){
   
   p <- ggplot(data, aes(x = factor(Var2), y = factor(Var1), fill = factor(value)))+
@@ -2298,7 +2658,7 @@ plot_heatmap = function(data, num, param){
   
   if (param == "R0"){
     p <- p + scale_y_discrete(expand = c(0,0), breaks = seq(1, num, by = 2),
-                                labels = seq(1.3, 2.6, by = 0.2))
+                                labels = seq(1.1, 2.0, by = 0.1))
   } else if (param == "ve"){
     p <- p + scale_y_discrete(expand = c(0,0), breaks = seq(1, num, by = 2),
                                 labels = c(" 30", " 50", " 70", " 90"))
@@ -2307,7 +2667,7 @@ plot_heatmap = function(data, num, param){
                               labels = c("BEL", "USA", "IND", "ESP", "ZWE", "BRA", "CHN", "ZAF", "POL"))
   } else if (param == "rollout") {
     p <- p + scale_y_discrete(expand = c(0,0), breaks = seq(1, num, by = 1),
-                              labels = seq(0.25, 2, by = 0.25))
+                              labels = c(0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1))
   } else if (param == "ve_I"){
     p <- p + scale_y_discrete(expand = c(0,0), breaks = seq(1, num, by = 2),
                               labels = c(" 0"," 20", " 40", " 60", " 80", "100"))
