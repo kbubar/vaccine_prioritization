@@ -34,7 +34,7 @@ sero_none <- rep(0, 9)
 # RUN SIM ----
 # _____________________________________________________________________
 this_C <- C/scale_15
-dat <- run_sim_new(this_C, percent_vax = 0, strategy = "all", num_perday = 0.01, v_e_type = "aorn")
+dat <- run_sim(this_C, percent_vax = 0, strategy = "all", num_perday = 0.01, v_e_type = "aorn")
 
 R <- dat[,83:91] + dat[,101:109]
 R_tot <- rowSums(R)

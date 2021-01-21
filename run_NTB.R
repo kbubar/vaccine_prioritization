@@ -1,73 +1,12 @@
 # _____________________________________________________________________
 # IMPORT ----
 # _____________________________________________________________________
-library(tidyverse) 
-library(deSolve) # ode solver
-library(gridExtra)
-library(RColorBrewer)
-library(wesanderson)
-library(egg)
-library(foreach)
-library(doParallel)
-library(ggplot2)
-
-# ColorBrewer Dark2
-col_youngadults = "#1B9E77" # teal green (20-49)
-col_all = "#D95F02" # orange
-col_elderly = "#7570B3" # purple (60+)
-col_kids = "#E7298A" # magenta
-col_adults = "#66A61E" # light green (20+ strategy)
-
-tippingpointPal2 <- c("#E6E6E6", "#FFEDA0", "#FEB24C", "#F03B20", "#000000")
-names(tippingpointPal2) <- c("None", "0-25%", "25-50%",
-                             "50-100%", "NA")
-
-colFill2 <- scale_fill_manual(name = "Tipping point", values = tippingpointPal2)
-
-theme_set(theme_minimal(base_size = 12))
-
-nolabels_theme <- theme(axis.title.x =element_blank(),
-                        axis.text.x = element_blank(),
-                        axis.title.y = element_blank(),
-                        axis.text.y = element_blank(),
-                        plot.title = element_text(size = 12, face = "plain"),
-                        legend.position = "none")
-onlyx_theme <- theme(axis.title.y = element_blank(),
-                     axis.text.y = element_blank(),
-                     plot.title = element_text(size = 12, face = "plain"),
-                     legend.position = "none")
-onlyy_theme <- theme(axis.title.x = element_blank(),
-                     axis.text.x = element_blank(),
-                     plot.title = element_text(size = 12, face = "plain"),
-                     legend.position = "none")
 # _____________________________________________________________________
 # FUNCTIONS ----
 # _____________________________________________________________________
 source("run_sim.R")
 source("helper_functions.R")
 source("setup.R")
-# country    <- "USA"
-# 
-# C          <- readRDS(paste0("C_", country, "_bytens_overall.RData"))
-# C_low      <- C/2 # scale to an R_0 of 1.3
-# 
-# age_demo   <- readRDS(paste0("age_demographics_", country,".RData"))
-# 
-# pop_total  <- age_demo[10]
-# age_demo   <- age_demo[1:9]
-# 
-# N_i        <- pop_total*age_demo      
-# num_groups <- length(age_demo) # num age groups
-# 
-# IFR        <- c(9.530595e-04, 3.196070e-03, 1.071797e-02, 3.594256e-02, 1.205328e-01, 
-#                 4.042049e-01, 1.355495e+00, 4.545632e+00, 1.524371e+01) # Ref: Levin
-# IFR        <- IFR/100 # as decimal
-# YLL_vec    <- readRDS(paste0("yll_vec_", country, ".RData"))
-# 
-# u_var      <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)
-# R0         <- compute_R0(u_var, C)
-# 
-# sero_none <- rep(0, 9) # no prior immunity
 
 # NTB: move vaccinated is the same with sp = 1, se = 0
 ve_S <- rep(0, 9)

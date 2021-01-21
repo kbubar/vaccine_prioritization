@@ -1,70 +1,14 @@
 # _____________________________________________________________________
-# IMPORT ----
-# _____________________________________________________________________
-library(tidyverse) 
-library(deSolve) # ode solver
-library(gridExtra)
-library(RColorBrewer)
-library(egg)
-library(foreach)
-library(doParallel)
-library(gplots)
-
-# ColorBrewer Dark2
-col_youngadults = "#1B9E77" # teal green (20-49)
-col_all = "#D95F02" # orange
-col_elderly = "#7570B3" # purple (60+)
-col_kids = "#E7298A" # magenta
-col_adults = "#66A61E" # light green (20+ strategy)
-
-theme_set(theme_minimal(base_size = 12))
-
-nolabels_theme <- theme(axis.title.x =element_blank(),
-                        axis.text.x = element_blank(),
-                        axis.title.y = element_blank(),
-                        axis.text.y = element_blank(),
-                        plot.title = element_text(size = 12, face = "plain"),
-                        legend.position = "none")
-onlyx_theme <- theme(axis.title.y = element_blank(),
-                     axis.text.y = element_blank(),
-                     plot.title = element_text(size = 12, face = "plain"),
-                     legend.position = "none")
-onlyy_theme <- theme(axis.title.x = element_blank(),
-                     axis.text.x = element_blank(),
-                     plot.title = element_text(size = 12, face = "plain"),
-                     legend.position = "none")
-# _____________________________________________________________________
 # FUNCTIONS ----
 # _____________________________________________________________________
 source("run_sim.R")
 source("helper_functions.R")
-
-# _____________________________________________________________________
-# SET UP ----
-# _____________________________________________________________________
-# country codes:
 country <- "USA"
-v_e_type <- "aorn"
-
-u_var     <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)
-
-this_v_e <- rep(0.9, 9)
-
-IFR     <- c(9.530595e-04, 3.196070e-03, 1.071797e-02, 3.594256e-02, 1.205328e-01, 
-             4.042049e-01, 1.355495e+00, 4.545632e+00, 1.524371e+01) # Ref: Levin
-IFR     <- IFR/100 # as decimal
-YLL_vec <- readRDS(paste0("yll_vec_", country, ".RData"))
-
-C <- readRDS(paste0("C_", country, "_bytens_overall.RData"))
-
-age_demo <- readRDS(paste0("age_demographics_", country,".RData"))
-pop_total <- age_demo[10]
-age_demo <- age_demo[1:9]
-N_i <-  pop_total*age_demo      
-num_groups <- length(age_demo) # num age groups
-
-sero_none <- rep(0, 9) # no prior immunity
-
+source("setup.R")
+# _____________________________________________________________________
+# RUN SIM ----
+# Create heatmap for a range of R0 values
+# _____________________________________________________________________
 # scale C to get range of R0
 scale_C <- c()
 R0 <- seq(1.1, 2, by = 0.05)
@@ -91,11 +35,11 @@ HM <- foreach(this_scale_C = scale_C) %dopar% {
   num_perday <- 0.001
   for (i in seq(0, 50, by = 1)){
     j <- i/100
-    list_all[[paste0(i)]] <- run_sim_new(this_C, j, "all", num_perday, v_e_type, this_v_e)
-    list_kids[[paste0(i)]] <- run_sim_new(this_C, j, "kids", num_perday, v_e_type, this_v_e)
-    list_adults[[paste0(i)]] <- run_sim_new(this_C, j, "adults", num_perday, v_e_type, this_v_e)
-    list_elderly[[paste0(i)]] <- run_sim_new(this_C, j, "elderly", num_perday, v_e_type, this_v_e)
-    list_twentyplus[[paste0(i)]] <- run_sim_new(this_C, j, "twentyplus", num_perday, v_e_type, this_v_e)
+    list_all[[paste0(i)]] <- run_sim(this_C, j, "all", num_perday, v_e_type, this_v_e)
+    list_kids[[paste0(i)]] <- run_sim(this_C, j, "kids", num_perday, v_e_type, this_v_e)
+    list_adults[[paste0(i)]] <- run_sim(this_C, j, "adults", num_perday, v_e_type, this_v_e)
+    list_elderly[[paste0(i)]] <- run_sim(this_C, j, "elderly", num_perday, v_e_type, this_v_e)
+    list_twentyplus[[paste0(i)]] <- run_sim(this_C, j, "twentyplus", num_perday, v_e_type, this_v_e)
   }
   x_vec <- seq(1, 50, by = 1)
   I1 <- sapply(x_vec, FUN = function(x) get_best_strat_cases_new(x, list_all,list_kids,list_adults,
@@ -110,11 +54,11 @@ HM <- foreach(this_scale_C = scale_C) %dopar% {
   list_all <- list_kids <- list_adults <- list_elderly <- list_twentyplus <- vector(mode = "list")
   for (i in seq(0, 50, by = 1)){
     j <- i/100
-    list_all[[paste0(i)]] <- run_sim_new(this_C, j, "all", num_perday, v_e_type, this_v_e)
-    list_kids[[paste0(i)]] <- run_sim_new(this_C, j, "kids", num_perday, v_e_type, this_v_e)
-    list_adults[[paste0(i)]] <- run_sim_new(this_C, j, "adults", num_perday, v_e_type, this_v_e)
-    list_elderly[[paste0(i)]] <- run_sim_new(this_C, j, "elderly", num_perday, v_e_type, this_v_e)
-    list_twentyplus[[paste0(i)]] <- run_sim_new(this_C, j, "twentyplus", num_perday, v_e_type, this_v_e)
+    list_all[[paste0(i)]] <- run_sim(this_C, j, "all", num_perday, v_e_type, this_v_e)
+    list_kids[[paste0(i)]] <- run_sim(this_C, j, "kids", num_perday, v_e_type, this_v_e)
+    list_adults[[paste0(i)]] <- run_sim(this_C, j, "adults", num_perday, v_e_type, this_v_e)
+    list_elderly[[paste0(i)]] <- run_sim(this_C, j, "elderly", num_perday, v_e_type, this_v_e)
+    list_twentyplus[[paste0(i)]] <- run_sim(this_C, j, "twentyplus", num_perday, v_e_type, this_v_e)
   }
   
   x_vec <- seq(1, 50, by = 1)
@@ -221,12 +165,7 @@ pS1_Y <- plot_heatmap(reshape2::melt(S1_Ynew), num, param) +
 pS2_Y <- plot_heatmap(reshape2::melt(S2_Ynew), num, param) +
   onlyx_theme
 
-# export as 9" x 6"
+# export as 8.5" x 6"
 g <- ggarrange(pS1_I, pS2_I, pS1_M, pS2_M, pS1_Y, pS2_Y,
                bottom = textGrob("Total vaccine supply (% of population)", gp = gpar(fontsize = 12)),
                padding = unit(0.5, "line"))
-
-pdf("C:/Users/bubar/Documents/Vaccine Strategy/Plots/finaldraft_plots/heatmap_R0.pdf",
-    height = 6, width = 8.5)
-g
-dev.off()

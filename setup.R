@@ -10,6 +10,7 @@ library(egg)
 library(foreach)
 library(doParallel)
 library(ggplot2)
+library(gplots)
 
 # ColorBrewer Dark2
 col_youngadults = "#1B9E77" # teal green (20-49)
@@ -63,7 +64,7 @@ IFR        <- c(9.807703e-04, 3.277686e-03, 1.095386e-02, 3.660727e-02, 1.223397
 IFR        <- IFR/100 # as decimal
 YLL_vec    <- readRDS(paste0("yll_vec_", country, ".RData"))
 
-u_var      <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)
+u_var      <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74) # Ref: Davies2020
 
 this_v_e   <- get_v_e(p = 0.9, y0 = 0.9, hinge_age = 50)
 v_e_var    <- get_v_e(p = 0.5, y0 = 0.9, hinge_age = 50)
@@ -86,47 +87,3 @@ scale_26 <- scale_u_for_R0(u_var, C, 2.6)
 C_115 <- C/scale_115
 C_15  <- C/scale_15
 C_26  <- C/scale_26
-
-# print(compute_R0(u_var, C_115))
-# print(compute_R0(u_var, C_15))
-# print(compute_R0(u_var, C_26))
-
-# country    <- "USA"
-# 
-# C          <- readRDS(paste0("C_", country, "_bytens_overall.RData"))
-# 
-# age_demo   <- readRDS(paste0("age_demographics_", country,".RData"))
-# 
-# pop_total  <- age_demo[10]
-# age_demo   <- age_demo[1:9]
-# 
-# N_i        <- pop_total*age_demo      
-# num_groups <- length(age_demo) # num age groups
-# 
-# IFR        <- c(9.530595e-04, 3.196070e-03, 1.071797e-02, 3.594256e-02, 1.205328e-01, 
-#                 4.042049e-01, 1.355495e+00, 4.545632e+00, 1.524371e+01) # Ref: Levin
-# IFR        <- IFR/100 # as decimal
-# YLL_vec    <- readRDS(paste0("yll_vec_", country, ".RData"))
-# 
-# # susceptibility with R0 =2.6 for BEL, ref: Davies
-# #u_constant <- rep(0.0154, 9) 
-# u_var <- c(0.4, 0.38, 0.79, 0.86, 0.8, 0.82, 0.88, 0.74, 0.74)
-# scale_115 <- scale_u_for_R0(u_var, C, 1.15)
-# scale_15 <- scale_u_for_R0(u_var, C, 1.5)
-# scale_26 <- scale_u_for_R0(u_var, C, 2.6)
-# 
-# R0         <- compute_R0(u_var, C/scale_26)
-# 
-# this_v_e   <- get_v_e(p = 0.9, y0 = 0.9, hinge_age = 50)
-# v_e_var    <- get_v_e(p = 0.5, y0 = 0.9, hinge_age = 50)
-# v_e_type   <- "aorn"
-# 
-# sero_none <- rep(0, 9) # no prior immunity
-# sero_CT <- c(0.039, 0.0382, 0.031, 0.031, 0.031, 0.037, 0.032, 0.027, 0.027)
-# sero_NY <- c(0.32, 0.3129, 0.249, 0.249, 0.264, 0.279, 0.2575, 0.2215, 0.207) # ref: NYC
-# 
-# this_sp <- 0.99
-# this_se <- 0.70
-# 
-# num_perday <- 0.002
-# list_all <- list_kids <- list_adults <- list_elderly <- list_twentyplus <- vector(mode = "list")
